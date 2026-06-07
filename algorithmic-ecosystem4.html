@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algorithmic Ecosystem</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0e27; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; color: #fff; }
+        canvas { display: block; width: 100%; height: 100%; background: radial-gradient(ellipse at center, rgba(100, 150, 200, 0.15) 0%, rgba(10, 14, 39, 1) 100%); z-index: 1; }
+
+
+
+        .category-cards {
+            display: flex;
+            flex-direction: row;
+            gap: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(118,215,255,0.2);
+            border-radius: 12px;
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 100;
+            pointer-events: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            width: 58px;
+            transition: all 0.25s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(118, 215, 255, 0.6);
+            box-shadow: 0 8px 32px rgba(118, 215, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Gesture-activated glow */
+        .card.gesture-active {
+            border-color: rgba(118, 215, 255, 1);
+            box-shadow:
+                0 0 20px rgba(118, 215, 255, 0.8),
+                0 0 45px rgba(118, 215, 255, 0.5),
+                0 0 70px rgba(118, 215, 255, 0.25);
+            background: rgba(118, 215, 255, 0.14);
+            transform: translateY(-5px) scale(1.05);
+        }
+
+        /* Purchase flash */
+        @keyframes purchaseFlash {
+            0%   { box-shadow: 0 0 60px rgba(118,215,255,0.9), 0 0 30px rgba(255,255,255,0.6); }
+            100% { box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        }
+        .card.purchased { animation: purchaseFlash 0.6s ease-out; }
+
+        .card-icon    { font-size: 16px; }
+        .card-name    { font-size: 8px; color: rgba(255,255,255,0.6); font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }
+        .card-price   { font-size: 9px; color: rgba(255, 215, 0, 0.8); font-weight: bold; }
+
+
+
+
+        #webcam { position: fixed; bottom: 20px; left: 20px; width: 240px; height: 180px;
+                  border: 2px solid rgba(118,215,255,0.5); border-radius: 8px;
+                  background: #000; z-index: 5; display: none; }
+        .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10; }
+
+        #toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.85);
+            background: rgba(20, 20, 40, 0.92);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 120, 60, 0.6);
+            border-radius: 14px;
+            padding: 14px 24px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            box-shadow: 0 0 30px rgba(255,100,40,0.25);
+            white-space: nowrap;
+        }
+        #toast.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .toggle-camera {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(74, 158, 255, 0.9);
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            z-index: 20;
+            pointer-events: auto;
+            transition: all 0.2s;
+        }
+
+        .toggle-camera:hover {
+            background: rgba(74, 158, 255, 1);
+            transform: translateY(-2px);
+        }
+
+        .gesture-guide {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(118,215,255,0.2);
+            border-radius: 12px;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 100;
+            pointer-events: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            max-width: 260px;
+            overflow: visible;
+        }
+
+        .gesture-guide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .gesture-guide-title {
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .gesture-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            transition: all 0.25s ease;
+        }
+
+        .gesture-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(118, 215, 255, 0.6);
+            box-shadow: 0 4px 16px rgba(118, 215, 255, 0.1);
+        }
+
+        .gesture-hand {
+            font-size: 20px;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        .gesture-text {
+            flex: 1;
+        }
+
+        .gesture-text .gesture-action {
+            font-size: 10px;
+            color: rgba(255,255,255,0.9);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .gesture-text .gesture-desc {
+            font-size: 8px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 2px;
+        }
+
+        /* Close button styling */
+        .close-btn {
+            position: absolute;
+            top: -14px;
+            right: -14px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.7);
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            pointer-events: auto;
+            z-index: 110;
+            padding: 0;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 100, 100, 0.3);
+            border-color: rgba(255, 100, 100, 0.6);
+            color: rgba(255, 255, 255, 1);
+        }
+
+        /* Panel visibility toggle */
+        .gesture-guide, .category-cards {
+            transition: all 0.3s ease;
+        }
+
+        .gesture-guide.hidden, .category-cards.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+        }
+
+        .show-panels-btn {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            background: rgba(118, 215, 255, 0.2);
+            border: 1px solid rgba(118, 215, 255, 0.4);
+            color: rgba(118, 215, 255, 0.8);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            pointer-events: auto;
+            z-index: 95;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .show-panels-btn.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .show-panels-btn:hover {
+            background: rgba(118, 215, 255, 0.4);
+            border-color: rgba(118, 215, 255, 0.8);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="aquarium"></canvas>
+    <video id="webcam" playsinline muted autoplay style="position:fixed;width:1px;height:1px;opacity:0;z-index:-1;"></video>
+    <div id="toast"></div>
+
+    <div class="gesture-guide">
+        <button class="close-btn" onclick="togglePanels()">✕</button>
+        <div class="gesture-guide-title">🖐️ Hand Commands</div>
+        <div class="gesture-item">
+            <div class="gesture-hand">🖐️</div>
+            <div class="gesture-text">
+                <div class="gesture-action">OPEN PALM</div>
+                <div class="gesture-desc">Dispense food</div>
+            </div>
+        </div>
+        <div class="gesture-item">
+            <div class="gesture-hand">✌️</div>
+            <div class="gesture-text">
+                <div class="gesture-action">PEACE SIGN</div>
+                <div class="gesture-desc">Get hat (5🪙)</div>
+            </div>
+        </div>
+        <div class="gesture-item">
+            <div class="gesture-hand">👍</div>
+            <div class="gesture-text">
+                <div class="gesture-action">THUMBS UP</div>
+                <div class="gesture-desc">Get glasses (5🪙)</div>
+            </div>
+        </div>
+        <div class="gesture-item">
+            <div class="gesture-hand">👋</div>
+            <div class="gesture-text">
+                <div class="gesture-action">THREE FINGERS</div>
+                <div class="gesture-desc">Baby fish (10🪙)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="category-cards">
+        <div class="card" data-item="food">
+            <div class="card-icon">🍴</div>
+            <div class="card-name">Food</div>
+            <div class="card-price">🪙 1</div>
+        </div>
+        <div class="card" data-item="hat">
+            <div class="card-icon">🎩</div>
+            <div class="card-name">Hat</div>
+            <div class="card-price">🪙 5</div>
+        </div>
+        <div class="card" data-item="glasses">
+            <div class="card-icon">🕶️</div>
+            <div class="card-name">Glasses</div>
+            <div class="card-price">🪙 5</div>
+        </div>
+        <div class="card" data-item="babyFish">
+            <div class="card-icon">🐠</div>
+            <div class="card-name">Baby</div>
+            <div class="card-price">🪙 10</div>
+        </div>
+    </div>
+
+    <div class="overlay">
+        <button class="show-panels-btn" onclick="togglePanels()" title="Show panels (H key)">👁️</button>
+        <button class="toggle-camera" onclick="toggleCamera()">📹 Show Camera</button>
+    </div>
+
+    <script async src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+
+    <script>
+    // ================================================================
+    // SETUP
+    // ================================================================
+    const canvas = document.getElementById('aquarium');
+    const ctx    = canvas.getContext('2d');
+    const video  = document.getElementById('webcam');
+
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    window.addEventListener('resize', () => {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+        initRockPositions();
+        initCoralPositions();
+    });
+
+    let fishes = [], foods = [], hands = [], bubbles = [], floatingTexts = [];
+    let feedCounter = 0;
+    const maxBubbles = 30;
+    let cameraActive = false, handDetector = null;
+    let latestHandLandmarks = [];
+    let _toastTimer = null;
+    const _toastEl = document.getElementById('toast');
+
+    function showToast(text) {
+        _toastEl.textContent = text;
+        _toastEl.classList.add('show');
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(() => _toastEl.classList.remove('show'), 2200);
+    }
+
+    function drawToast() {} // no-op, toast is now HTML
+
+    const SHOP_PRICES = { food: 1, hat: 5, glasses: 5, babyFish: 10 };
+    let sinkingItems = [];
+
+    // ================================================================
+    // GESTURE RECOGNITION
+    // Gestures mapped to shop items:
+    //   Open palm (all 5 extended)  → food
+    //   Peace sign (index + middle) → hat
+    //   Shaka (thumb + pinky)       → glasses
+    //   Three fingers (idx+mid+ring)→ babyFish
+    // ================================================================
+    const GESTURE_COOLDOWN_MS = 1500; // prevent rapid re-trigger
+    let lastGestureFired = {};        // itemType → timestamp
+
+    function isFingerExtended(lm, tipIdx, pipIdx) {
+        // tip must be above (lower y) its PIP joint
+        return lm[tipIdx].y < lm[pipIdx].y;
+    }
+
+    function classifyGesture(lm) {
+        const thumb  = lm[4].x  < lm[3].x;  // thumb tip left of knuckle (mirrored)
+        // For mirrored video (1-x), check thumb differently
+        // We'll use raw landmark x: thumb extended = tip far from palm
+        const thumbExt  = Math.abs(lm[4].x - lm[0].x) > 0.1;
+        const indexExt  = isFingerExtended(lm, 8, 6);
+        const middleExt = isFingerExtended(lm, 12, 10);
+        const ringExt   = isFingerExtended(lm, 16, 14);
+        const pinkyExt  = isFingerExtended(lm, 20, 18);
+
+        const extCount = [indexExt, middleExt, ringExt, pinkyExt].filter(Boolean).length;
+
+        // Open palm: all 4 fingers extended (thumb doesn't matter)
+        if (indexExt && middleExt && ringExt && pinkyExt) return 'food';
+
+        // Peace sign: index + middle extended, ring + pinky curled
+        if (indexExt && middleExt && !ringExt && !pinkyExt) return 'hat';
+
+        // Shaka (call me): thumb + pinky extended, index + middle + ring curled
+        if (thumbExt && !indexExt && !middleExt && !ringExt && pinkyExt) return 'glasses';
+
+        // Three fingers: index + middle + ring extended, pinky curled
+        if (indexExt && middleExt && ringExt && !pinkyExt) return 'babyFish';
+
+        return null;
+    }
+
+    function tryFireGesture(gesture) {
+        if (!gesture) return;
+        const now = performance.now();
+        const last = lastGestureFired[gesture] || 0;
+        if (now - last < GESTURE_COOLDOWN_MS) return;
+        lastGestureFired[gesture] = now;
+        triggerGestureItem(gesture);
+    }
+
+    // ================================================================
+    // SOUND SYNTHESIS FUNCTIONS
+    // ================================================================
+    function getAudioContext() {
+        if (!window.soundAudioContext) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) window.soundAudioContext = new AudioCtx();
+        }
+        return window.soundAudioContext;
+    }
+
+    function playSoundFoodDispense() {
+        const ac = getAudioContext();
+        if (!ac) return;
+        const now = ac.currentTime;
+        const master = ac.createGain();
+        master.gain.setValueAtTime(0.4, now);
+        master.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        master.connect(ac.destination);
+        
+        // Bright coin/ding sound - satisfying and musical
+        const osc = ac.createOscillator();
+        const g = ac.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);  // High C
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+        
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.6, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        
+        osc.connect(g);
+        g.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.36);
+    }
+
+    function playSoundHat() {
+        const ac = getAudioContext();
+        if (!ac) return;
+        const now = ac.currentTime;
+        const master = ac.createGain();
+        master.gain.setValueAtTime(0.35, now);
+        master.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        master.connect(ac.destination);
+        
+        // Bright ascending ding - celebratory
+        const osc = ac.createOscillator();
+        const g = ac.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523, now);  // C5
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);  // A5
+        
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.5, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        
+        osc.connect(g);
+        g.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.51);
+    }
+
+    function playSoundGlasses() {
+        const ac = getAudioContext();
+        if (!ac) return;
+        const now = ac.currentTime;
+        const master = ac.createGain();
+        master.gain.setValueAtTime(0.3, now);
+        master.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        master.connect(ac.destination);
+        
+        // Clean, sharp metallic click - satisfying frame on nose
+        const osc = ac.createOscillator();
+        const g = ac.createGain();
+        const hp = ac.createBiquadFilter();
+        
+        hp.type = 'highpass';
+        hp.frequency.value = 2800;
+        hp.Q.value = 1.5;
+        
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(880, now);  // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, now + 0.05);
+        
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.4, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        
+        osc.connect(hp);
+        hp.connect(g);
+        g.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.13);
+    }
+
+    function playSoundBaby() {
+        const ac = getAudioContext();
+        if (!ac) return;
+        const now = ac.currentTime;
+        const master = ac.createGain();
+        master.gain.setValueAtTime(0.28, now);
+        master.gain.exponentialRampToValueAtTime(0.02, now + 0.6);
+        master.connect(ac.destination);
+        
+        // Cute, whimsical rising melody - baby fish born!
+        const notes = [392, 440, 523];  // G4, A4, C5
+        
+        notes.forEach((freq, i) => {
+            const osc = ac.createOscillator();
+            const g = ac.createGain();
+            const lp = ac.createBiquadFilter();
+            
+            lp.type = 'lowpass';
+            lp.frequency.value = 3000;
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + i * 0.1);
+            
+            g.gain.setValueAtTime(0.001, now + i * 0.1);
+            g.gain.linearRampToValueAtTime(0.35, now + i * 0.1 + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.18);
+            
+            osc.connect(lp);
+            lp.connect(g);
+            g.connect(master);
+            osc.start(now + i * 0.1);
+            osc.stop(now + i * 0.1 + 0.19);
+        });
+    }
+
+    function triggerGestureItem(itemType) {
+        // Visual feedback on card
+        const card = document.querySelector(`.card[data-item="${itemType}"]`);
+        if (card) {
+            card.classList.add('gesture-active', 'purchased');
+            setTimeout(() => card.classList.remove('gesture-active', 'purchased'), 700);
+        }
+
+        // Execute item action
+        if (itemType === 'food') {
+            // Scatter food across the top of the tank
+            const count = 5 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < count; i++) {
+                const fx = Math.random() * canvas.width;
+                const fy = 60 + Math.random() * 80;
+                foods.push(new Food(fx, fy));
+            }
+        } else if (itemType === 'babyFish') {
+            // costs 10 coins from richest fish
+            const payer = fishes.filter(f => f.coins >= SHOP_PRICES.babyFish).sort((a,b)=>b.coins-a.coins)[0];
+            if (payer) {
+                payer.coins -= SHOP_PRICES.babyFish;
+                floatingTexts.push({ x:payer.x, y:payer.y - payer.size*2, text:`-10🪙`, life:1.0, color:'#ff6644' });
+                fishes.push(new Fish({ size: 10, speedMultiplier: 1.4 }));
+                playSoundBaby();
+            } else {
+                showToast('💸 No fish has enough coins for a baby!');
+                return;
+            }
+        } else {
+            // Hat or Glasses
+            if (buyItemForFish(itemType)) {
+                if (itemType === 'hat') playSoundHat();
+                else if (itemType === 'glasses') playSoundGlasses();
+            }
+        }
+    }
+
+    // Clear active card highlights when no gesture
+    let lastGestureType = null;
+    function updateGestureUI(gesture) {
+        if (gesture !== lastGestureType) {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('gesture-active'));
+            if (gesture) {
+                const card = document.querySelector(`.card[data-item="${gesture}"]`);
+                if (card) card.classList.add('gesture-active');
+            }
+            lastGestureType = gesture;
+        }
+    }
+
+    // Mouse click still works
+    document.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('click', () => triggerShopItem(card.dataset.item));
+    });
+
+    function buyItemForFish(itemType) {
+        const affordable = fishes.filter(f => f.coins >= SHOP_PRICES[itemType]);
+        if (affordable.length > 0) {
+            // pick the richest fish to spend
+            affordable.sort((a,b) => b.coins - a.coins);
+            affordable[0].buyItem(itemType);
+            return true;
+        }
+        // No fish can afford it — show toast
+        showToast(`💸 No fish has enough coins for a ${itemType}!`);
+        return false;
+    }
+
+    // ================================================================
+    // BUBBLES
+    // ================================================================
+    class Bubble {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = canvas.height + 20;
+            this.size = Math.random() * 4 + 2;
+            this.speedY = Math.random() * 1 + 0.5;
+            this.wobble = Math.random() * Math.PI * 2;
+            this.wobbleSpeed = Math.random() * 0.03 + 0.01;
+        }
+        update() { this.y -= this.speedY; this.wobble += this.wobbleSpeed; this.x += Math.sin(this.wobble) * 0.5; }
+        draw() {
+            ctx.fillStyle = `rgba(255,255,255,${0.2 - this.y / canvas.height * 0.15})`;
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+        }
+        isOffScreen() { return this.y < -10; }
+    }
+
+    // ================================================================
+    // SEAWEED PARTICLES
+    // ================================================================
+    let seaweedParticles = [];
+    class SeaweedParticle {
+        constructor() {
+            this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height;
+            this.size = Math.random() * 8 + 4; this.speedY = Math.random() * 0.3 + 0.1;
+            this.speedX = Math.sin(Math.random() * Math.PI * 2) * 0.2;
+            this.opacity = Math.random() * 0.4 + 0.2;
+            this.sway = Math.random() * Math.PI * 2; this.swaySpeed = Math.random() * 0.02 + 0.01;
+        }
+        update() {
+            this.y -= this.speedY; this.x += this.speedX + Math.sin(this.sway) * 0.3; this.sway += this.swaySpeed;
+            if (this.y < 0) { this.y = canvas.height; this.x = Math.random() * canvas.width; }
+        }
+        draw() {
+            ctx.fillStyle = `rgba(46,139,87,${this.opacity})`;
+            ctx.beginPath(); ctx.ellipse(this.x, this.y, this.size, this.size * 0.5, Math.sin(reefTime + this.sway) * 0.3, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+    function initSeaweedParticles() { seaweedParticles = []; for (let i = 0; i < 20; i++) seaweedParticles.push(new SeaweedParticle()); }
+    function drawSeaweedParticles() { seaweedParticles.forEach(p => { p.update(); p.draw(); }); }
+
+    // ================================================================
+    // ROCKS
+    // ================================================================
+    let rockFormations = [];
+    function initRockPositions() {
+        rockFormations = [
+            { x: 80,  y: canvas.height-5, r: 24, points: [0.9,1.1,0.8,1.2,0.95,0.85,1.05,1.1] },
+            { x: 140, y: canvas.height-5, r: 18, points: [1.1,0.85,1.15,0.9,1.05,1.2,0.8,0.95] },
+            { x: 200, y: canvas.height-5, r: 20, points: [0.95,1.15,0.9,1.1,1.05,0.8,1.2,0.85] },
+            { x: 250, y: canvas.height-5, r: 22, points: [1.0,0.9,1.2,0.85,1.05,1.15,0.9,1.1] },
+            { x: canvas.width-80,  y: canvas.height-5, r: 30, points: [1.0,1.05,0.9,1.15,0.85,1.1,1.2,0.95] },
+            { x: canvas.width-140, y: canvas.height-5, r: 18, points: [0.95,1.15,0.9,1.1,1.05,0.8,1.2,0.85] },
+            { x: canvas.width-200, y: canvas.height-5, r: 20, points: [1.1,0.85,1.15,0.9,1.05,1.2,0.8,0.95] },
+            { x: canvas.width-250, y: canvas.height-5, r: 22, points: [1.0,0.9,1.2,0.85,1.05,1.15,0.9,1.1] }
+        ];
+    }
+    function drawAquariumRocks() {
+        rockFormations.forEach(rock => {
+            ctx.beginPath();
+            const steps = rock.points.length;
+            for (let i = 0; i <= steps; i++) {
+                const angle = (i / steps) * Math.PI * 2;
+                const r = rock.r * rock.points[i % steps];
+                const x = rock.x + r * Math.cos(angle), y = rock.y + r * Math.sin(angle) * 0.7;
+                i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+            }
+            ctx.closePath();
+            const g = ctx.createLinearGradient(rock.x, rock.y-rock.r, rock.x, rock.y+rock.r);
+            g.addColorStop(0,'#3a4454'); g.addColorStop(0.5,'#242b35'); g.addColorStop(1,'#12161c');
+            ctx.fillStyle = g; ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1.5; ctx.stroke();
+        });
+    }
+
+    // ================================================================
+    // CORAL ENGINE
+    // ================================================================
+    let reefTime = 0, coralPositions = [];
+    function initCoralPositions() {
+        coralPositions = [
+            { x: 80,  y: canvas.height-5  },
+            { x: 200, y: canvas.height-10 },
+            { x: canvas.width-80, y: canvas.height-5 }
+        ];
+    }
+    function growAquariumCoral(x,y,length,angle,depth) {
+        if (depth > 5) return;
+        const wave = Math.sin(reefTime + depth*0.8)*0.05;
+        const ex = x + length*Math.cos(angle+wave), ey = y + length*Math.sin(angle+wave);
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(ex,ey);
+        ctx.lineCap = 'round'; ctx.lineWidth = (6-depth)*2.5;
+        ctx.strokeStyle = `rgb(${230-depth*15},${110+depth*15},${120+depth*5})`; ctx.stroke();
+        const nl = length*0.75;
+        growAquariumCoral(ex,ey,nl,angle-0.45,depth+1);
+        growAquariumCoral(ex,ey,nl*0.85,angle+0.15,depth+1);
+        growAquariumCoral(ex,ey,nl,angle+0.55,depth+1);
+    }
+    function drawAnemoneCoral(bx,by,count,maxL) {
+        for (let i=0;i<count;i++) {
+            const sa = -Math.PI/2+(i/(count-1)-0.5)*1.2;
+            const cm = Math.sin(reefTime*2+i)*15;
+            const ex = bx+maxL*Math.cos(sa)+cm, ey = by+maxL*Math.sin(sa)+Math.cos(reefTime+i)*10;
+            const cpx = bx+(maxL/2)*Math.cos(sa)-cm, cpy = by+(maxL/2)*Math.sin(sa);
+            ctx.beginPath(); ctx.moveTo(bx,by); ctx.quadraticCurveTo(cpx,cpy,ex,ey);
+            ctx.lineCap='round'; ctx.lineWidth=3; ctx.strokeStyle='rgb(130,240,160)'; ctx.stroke();
+            ctx.beginPath(); ctx.fillStyle='#b0ffc0'; ctx.arc(ex,ey,2,0,Math.PI*2); ctx.fill();
+        }
+    }
+    function drawSunkenBoat() {
+        ctx.save();
+        const bx=canvas.width/2, by=canvas.height-12, s=3;
+        ctx.beginPath(); ctx.moveTo(bx,by);
+        ctx.quadraticCurveTo(bx+25*s,by-25*s,bx+55*s,by-20*s); ctx.lineTo(bx+45*s,by-5*s);
+        ctx.quadraticCurveTo(bx+20*s,by,bx,by); ctx.closePath();
+        const hg=ctx.createLinearGradient(bx,by-25*s,bx+30*s,by);
+        hg.addColorStop(0,'#2d3b32'); hg.addColorStop(1,'#151c18');
+        ctx.fillStyle=hg; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(bx+20*s,by-15*s); ctx.lineTo(bx+5*s,by-55*s);
+        ctx.lineTo(bx+8*s,by-55*s); ctx.lineTo(bx+24*s,by-15*s); ctx.fillStyle='#1c2420'; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(bx+6*s,by-50*s);
+        const sr=Math.sin(reefTime*1.2)*3*s;
+        ctx.quadraticCurveTo(bx-8*s+sr,by-35*s,bx-2*s,by-25*s);
+        ctx.quadraticCurveTo(bx+8*s,by-28*s,bx+16*s,by-25*s);
+        ctx.closePath(); ctx.fillStyle='rgba(45,60,52,0.4)'; ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=0.8; ctx.stroke();
+        ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath();
+        ctx.arc(bx+20*s,by-10*s,2*s,0,Math.PI*2); ctx.arc(bx+35*s,by-12*s,2*s,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+    function growSeaFan(x,y,length,angle,depth) {
+        if (depth>6) return;
+        const ss=Math.sin(reefTime*0.5+depth)*0.01;
+        const ex=x+length*Math.cos(angle+ss), ey=y+length*Math.sin(angle+ss);
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(ex,ey);
+        ctx.lineCap='square'; ctx.lineWidth=Math.max(1,4-depth*0.5);
+        ctx.strokeStyle=`rgb(${160+depth*10},60,${180-depth*10})`; ctx.stroke();
+        const nl=length*0.8; growSeaFan(ex,ey,nl,angle-0.3,depth+1); growSeaFan(ex,ey,nl,angle+0.3,depth+1);
+    }
+    function drawTallEelgrass(startX,plantHeight,leafWidth) {
+        ctx.save(); ctx.beginPath(); ctx.moveTo(startX,canvas.height-10);
+        const segments=15, points=[];
+        for (let i=0;i<=segments;i++) {
+            const p=i/segments, y=(canvas.height-10)-plantHeight*p;
+            const x=startX+Math.sin(reefTime*0.8+p*3)*(p*p*22);
+            points.push({x,y});
+        }
+        for (let i=0;i<points.length;i++) { const t=leafWidth*(1-(i/points.length)*0.5); ctx.lineTo(points[i].x-t/2,points[i].y); }
+        for (let i=points.length-1;i>=0;i--) { const t=leafWidth*(1-(i/points.length)*0.5); ctx.lineTo(points[i].x+t/2,points[i].y); }
+        ctx.closePath();
+        const pg=ctx.createLinearGradient(startX,canvas.height,startX,canvas.height-plantHeight);
+        pg.addColorStop(0,'rgba(34,110,63,0.75)'); pg.addColorStop(0.7,'rgba(46,170,95,0.6)'); pg.addColorStop(1,'rgba(120,220,150,0.4)');
+        ctx.fillStyle=pg; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=0.5; ctx.stroke(); ctx.restore();
+    }
+    function drawTallHairgrass(cx,cy,n,bh) {
+        ctx.save(); ctx.lineCap='round';
+        for (let i=0;i<n;i++) {
+            const bh2=bh-(i%4)*15, sx=cx+(i-n/2)*1.5;
+            const sway=Math.sin(reefTime*2.5+i*0.2)*14, spread=(i-n/2)*3;
+            ctx.beginPath(); ctx.moveTo(sx,cy);
+            ctx.quadraticCurveTo(sx+spread*0.5+sway*0.5,cy-bh2*0.5,sx+spread+sway,cy-bh2);
+            ctx.strokeStyle=i%3===0?'rgba(140,240,150,0.8)':i%2===0?'rgba(46,170,95,0.8)':'rgba(20,100,50,0.8)';
+            ctx.lineWidth=1.2; ctx.stroke();
+        }
+        ctx.restore();
+    }
+    function drawDriftwoodLog(cx,cy) {
+        ctx.save(); ctx.beginPath();
+        ctx.moveTo(cx-40,cy+10); ctx.quadraticCurveTo(cx-10,cy-25,cx+50,cy-30);
+        ctx.lineTo(cx+55,cy-15); ctx.quadraticCurveTo(cx,cy-10,cx-10,cy+2); ctx.closePath();
+        const wg=ctx.createLinearGradient(cx,cy-30,cx,cy+2);
+        wg.addColorStop(0,'#5a3d28'); wg.addColorStop(0.6,'#3d2516'); wg.addColorStop(1,'#21130a');
+        ctx.fillStyle=wg; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx+15,cy-22); ctx.quadraticCurveTo(cx+30,cy-45,cx+45,cy-50);
+        ctx.lineTo(cx+48,cy-45); ctx.quadraticCurveTo(cx+35,cy-38,cx+25,cy-19); ctx.fillStyle='#3d2516'; ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.5; ctx.beginPath();
+        ctx.moveTo(cx-25,cy+2); ctx.quadraticCurveTo(cx+10,cy-8,cx+40,cy-13);
+        ctx.moveTo(cx-10,cy+6); ctx.quadraticCurveTo(cx+20,cy-3,cx+45,cy-6);
+        ctx.stroke(); ctx.restore();
+    }
+    function drawAllCorals() {
+        reefTime += 0.01;
+        drawAquariumRocks(); drawSunkenBoat();
+        drawTallEelgrass(50,150,20); drawTallEelgrass(90,130,16);
+        drawDriftwoodLog(70,canvas.height-5);
+        coralPositions.forEach(pos => growAquariumCoral(pos.x,pos.y,40,-Math.PI/2,0));
+        growSeaFan(140,canvas.height-5,50,-Math.PI/2,0);
+        growSeaFan(canvas.width-140,canvas.height-5,50,-Math.PI/2,0);
+        drawAnemoneCoral(80,canvas.height-5,12,45); drawAnemoneCoral(canvas.width-80,canvas.height-5,12,45);
+        drawAnemoneCoral(40,canvas.height-5,10,40); drawAnemoneCoral(140,canvas.height-5,11,42);
+        drawDriftwoodLog(canvas.width*0.25,canvas.height-5); drawDriftwoodLog(canvas.width*0.75,canvas.height-5);
+        drawTallHairgrass(canvas.width-60,canvas.height-5,12,140); drawTallHairgrass(canvas.width-120,canvas.height-5,10,120);
+        ctx.fillStyle='#3a4454'; ctx.beginPath(); ctx.arc(canvas.width-60,canvas.height-10,12,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#2d3b42'; ctx.beginPath(); ctx.arc(canvas.width-120,canvas.height-10,10,0,Math.PI*2); ctx.fill();
+    }
+
+    // ================================================================
+    // FISH
+    // ================================================================
+    class Fish {
+        constructor(cfg={}) {
+            this.x = Math.random()*(canvas.width-60)+30; this.y = Math.random()*(canvas.height-60)+30;
+            this.size = cfg.size||(Math.random()*20+15); this.speedMultiplier = cfg.speedMultiplier||1;
+            this.color = cfg.color||`hsl(${Math.random()*360},70%,50%)`;
+            this.speedX = (Math.random()-0.5)*2*this.speedMultiplier; this.speedY = (Math.random()-0.5)*2*this.speedMultiplier;
+            this.targetFood=null; this.tailOffset=0; this.tailDirection=1; this.angle=0;
+            this.coins=0; this.itemWorn=null; this.itemColor=`hsl(${Math.random()*360},100%,50%)`;
+        }
+        update() {
+            this.tailOffset += this.tailDirection*0.3;
+            if (Math.abs(this.tailOffset)>5) this.tailDirection*=-1;
+            if (foods.length>0) this.findNearestFood(); else this.targetFood=null;
+            if (this.targetFood) {
+                const dx=this.targetFood.x-this.x, dy=this.targetFood.y-this.y, d=Math.sqrt(dx*dx+dy*dy);
+                this.angle=Math.atan2(dy,dx);
+                if (d>5) { this.speedX=(dx/d)*3*this.speedMultiplier; this.speedY=(dy/d)*3*this.speedMultiplier; }
+            } else {
+                this.angle=Math.atan2(this.speedY,this.speedX);
+                if (Math.random()<0.02) { this.speedX+=(Math.random()-0.5)*0.5; this.speedY+=(Math.random()-0.5)*0.5; }
+                const ms=2*this.speedMultiplier, cs=Math.sqrt(this.speedX**2+this.speedY**2);
+                if (cs>ms) { this.speedX=(this.speedX/cs)*ms; this.speedY=(this.speedY/cs)*ms; }
+            }
+            this.x+=this.speedX; this.y+=this.speedY;
+            if (this.x<=this.size||this.x>=canvas.width-this.size)  { this.speedX*=-1; this.x=Math.max(this.size,Math.min(canvas.width-this.size,this.x)); }
+            if (this.y<=this.size||this.y>=canvas.height-this.size) { this.speedY*=-1; this.y=Math.max(this.size,Math.min(canvas.height-this.size,this.y)); }
+        }
+        findNearestFood() {
+            let nd=Infinity,nf=null;
+            foods.forEach(f=>{ const d=Math.hypot(f.x-this.x,f.y-this.y); if(d<nd){nd=d;nf=f;} });
+            this.targetFood=nf;
+        }
+        draw() {
+            ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.angle);
+
+            // Body
+            ctx.fillStyle=this.color; ctx.globalAlpha=1;
+            ctx.beginPath(); ctx.ellipse(0,0,this.size,this.size*0.6,0,0,Math.PI*2); ctx.fill();
+
+            // Tail
+            ctx.beginPath(); ctx.moveTo(-this.size*0.8,0);
+            ctx.lineTo(-this.size*1.3,-this.size*0.5+this.tailOffset);
+            ctx.lineTo(-this.size*1.3, this.size*0.5+this.tailOffset); ctx.closePath(); ctx.fill();
+
+            // Eye
+            ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(this.size*0.3,-this.size*0.15,this.size*0.15,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(this.size*0.35,-this.size*0.17,this.size*0.08,0,Math.PI*2); ctx.fill();
+
+            // Fins
+            ctx.fillStyle=this.color; ctx.globalAlpha=0.7;
+            ctx.beginPath(); ctx.ellipse(0, this.size*0.4,this.size*0.4,this.size*0.2, Math.PI*0.2,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(0,-this.size*0.4,this.size*0.4,this.size*0.2,-Math.PI*0.2,0,Math.PI*2); ctx.fill();
+
+            // === TOP HAT ===
+            if (this.itemWorn==='hat') {
+                ctx.globalAlpha=1;
+                const s = this.size;
+                const hx = s * 0.1;   // shifted toward head
+                const hy = -s * 0.6;  // sit on top of fish
+
+                // Brim (wide flat ellipse)
+                ctx.fillStyle = this.itemColor;
+                ctx.beginPath();
+                ctx.ellipse(hx, hy, s*0.52, s*0.13, 0, 0, Math.PI*2); ctx.fill();
+                // Brim shadow/edge
+                ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
+                ctx.beginPath(); ctx.ellipse(hx, hy, s*0.52, s*0.13, 0, 0, Math.PI*2); ctx.stroke();
+
+                // Crown (tall rectangle-ish shape)
+                const cw = s*0.32, ch = s*0.55;
+                ctx.fillStyle = this.itemColor;
+                ctx.beginPath();
+                ctx.roundRect(hx - cw/2, hy - ch, cw, ch, s*0.04);
+                ctx.fill();
+                // Crown shading (left darker strip for 3D)
+                const cg = ctx.createLinearGradient(hx - cw/2, 0, hx + cw/2, 0);
+                cg.addColorStop(0,'rgba(0,0,0,0.3)'); cg.addColorStop(0.4,'rgba(0,0,0,0)'); cg.addColorStop(1,'rgba(0,0,0,0.15)');
+                ctx.fillStyle=cg;
+                ctx.beginPath(); ctx.roundRect(hx - cw/2, hy - ch, cw, ch, s*0.04); ctx.fill();
+
+                // Hat band (thin stripe near brim)
+                ctx.fillStyle='rgba(0,0,0,0.4)';
+                ctx.beginPath(); ctx.rect(hx - cw/2, hy - s*0.14, cw, s*0.1); ctx.fill();
+
+                // Crown top edge line
+                ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1;
+                ctx.beginPath(); ctx.roundRect(hx - cw/2, hy - ch, cw, ch, s*0.04); ctx.stroke();
+            }
+
+            // === GLASSES (monocle — one lens over the single eye) ===
+            if (this.itemWorn==='glasses') {
+                ctx.globalAlpha=1;
+                const s = this.size;
+                // Match exactly where the eye is drawn
+                const ex = s*0.3,  ey = -s*0.15;
+                const r  = s*0.22;   // slightly larger than the eyeball
+
+                const frameColor = this.itemColor;
+
+                // Lens tint
+                ctx.fillStyle = 'rgba(150,230,255,0.22)';
+                ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI*2); ctx.fill();
+
+                // Lens frame
+                ctx.strokeStyle = frameColor; ctx.lineWidth = s*0.08;
+                ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI*2); ctx.stroke();
+
+                // Chain/arm dangling toward the tail
+                ctx.beginPath();
+                ctx.moveTo(ex - r, ey + r*0.3);
+                ctx.quadraticCurveTo(ex - r - s*0.2, ey + s*0.25, ex - r - s*0.35, ey + s*0.35);
+                ctx.strokeStyle = frameColor; ctx.lineWidth = s*0.04;
+                ctx.setLineDash([s*0.06, s*0.05]); ctx.stroke();
+                ctx.setLineDash([]);  // always reset
+
+                // Lens shine
+                ctx.fillStyle='rgba(255,255,255,0.5)';
+                ctx.beginPath(); ctx.arc(ex - r*0.25, ey - r*0.28, r*0.2, 0, Math.PI*2); ctx.fill();
+            }
+
+            ctx.restore();
+
+            // Coin label — drawn in world space so it stays upright
+            ctx.save();
+            const fs = Math.max(10, this.size * 0.7);
+            ctx.font = `bold ${fs}px Arial`;
+            ctx.textAlign = 'center';
+            const labelY = this.y - this.size * 1.7;
+            const label = `🪙 ${this.coins}`;
+            const tw = ctx.measureText(label).width;
+            // pill background colour by wealth
+            ctx.fillStyle = this.coins >= 10 ? 'rgba(255,200,0,0.88)'
+                          : this.coins >= 5  ? 'rgba(160,160,255,0.82)'
+                          :                    'rgba(255,255,255,0.55)';
+            ctx.beginPath();
+            ctx.roundRect(this.x - tw/2 - 6, labelY - fs*0.85, tw + 12, fs + 4, 8);
+            ctx.fill();
+            ctx.fillStyle = '#111';
+            ctx.fillText(label, this.x, labelY);
+            ctx.restore();
+        }
+        buyItem(type) {
+            const cost = SHOP_PRICES[type];
+            if (this.coins >= cost) {
+                if (this.itemWorn) sinkingItems.push({type:this.itemWorn,x:this.x,y:this.y,color:this.itemColor,sinkSpeed:Math.random()*0.5+0.3});
+                this.coins -= cost;
+                this.itemWorn = type;
+                this.itemColor = `hsl(${Math.random()*360},100%,50%)`;
+                // floating spend text
+                floatingTexts.push({ x:this.x, y:this.y - this.size*2, text:`-${cost}🪙`, life:1.0, color:'#ff6644' });
+            }
+        }
+    }
+
+    // ================================================================
+    // FOOD
+    // ================================================================
+    class Food {
+        constructor(x,y) { this.x=x; this.y=y; this.size=3; this.opacity=1; feedCounter++; }
+        update() { this.y+=0.5; if(this.y>canvas.height-20) this.opacity-=0.02; }
+        draw() {
+            ctx.save(); ctx.globalAlpha=this.opacity;
+            ctx.fillStyle='#8B4513'; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='#D2691E'; ctx.beginPath(); ctx.arc(this.x-1,this.y-1,this.size*0.5,0,Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+        isOffScreen() { return this.y>canvas.height||this.opacity<=0; }
+    }
+
+    // ================================================================
+    // HAND SKELETON (no finger cursor dot)
+    // ================================================================
+    const HAND_CONNECTIONS = [
+        [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+        [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+        [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]
+    ];
+    function drawHandSkeleton(landmarks) {
+        const sl = landmarks.map(lm => ({ x:(1-lm.x)*canvas.width, y:lm.y*canvas.height }));
+        ctx.strokeStyle='rgba(76,175,80,0.5)'; ctx.lineWidth=2;
+        HAND_CONNECTIONS.forEach(([a,b]) => {
+            ctx.beginPath(); ctx.moveTo(sl[a].x,sl[a].y); ctx.lineTo(sl[b].x,sl[b].y); ctx.stroke();
+        });
+        sl.forEach((lm,i) => {
+            ctx.fillStyle = i===0 ? 'rgba(255,100,100,0.7)' : 'rgba(76,175,80,0.6)';
+            ctx.beginPath(); ctx.arc(lm.x,lm.y,4,0,Math.PI*2); ctx.fill();
+        });
+    }
+
+    // ================================================================
+    // CAMERA TOGGLE
+    // ================================================================
+    function toggleCamera() {
+        const webcam = document.getElementById('webcam');
+        const btn = document.querySelector('.toggle-camera');
+        if (webcam.style.display === 'none') {
+            webcam.style.display = 'block';
+            btn.textContent = '📹 Hide Camera';
+        } else {
+            webcam.style.display = 'none';
+            btn.textContent = '📹 Show Camera';
+        }
+    }
+
+    // ================================================================
+    // PANELS TOGGLE (Gesture Guide Only)
+    // ================================================================
+    function togglePanels() {
+        const gestureGuide = document.querySelector('.gesture-guide');
+        const showPanelsBtn = document.querySelector('.show-panels-btn');
+
+        const isHidden = gestureGuide.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show gesture guide
+            gestureGuide.classList.remove('hidden');
+            showPanelsBtn.classList.remove('visible');
+        } else {
+            // Hide gesture guide
+            gestureGuide.classList.add('hidden');
+            showPanelsBtn.classList.add('visible');
+        }
+    }
+
+    // Add keyboard shortcut (H key to toggle gesture guide)
+    document.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'h') {
+            togglePanels();
+        }
+    });
+
+    // ================================================================
+    // HAND DETECTION
+    // ================================================================
+    let lastPalmFeedTime = 0;
+    let lastGestureTime = {};
+    const GESTURE_COOLDOWN = 1000; // ms between same gestures
+
+    function triggerShopItem(itemType, palmPos) {
+        const now = Date.now();
+        const lastTime = lastGestureTime[itemType] || 0;
+        
+        // Cooldown check (only for gestures, not clicks)
+        if (palmPos && now - lastTime < GESTURE_COOLDOWN) {
+            return;
+        }
+        if (palmPos) {
+            lastGestureTime[itemType] = now;
+        }
+        
+        console.log(`🎯 Shop item triggered: ${itemType}`);
+        
+        // Highlight card
+        const card = document.querySelector(`.card[data-item="${itemType}"]`);
+        console.log(`Looking for card: .card[data-item="${itemType}"] - Found: ${card ? '✅ YES' : '❌ NO'}`);
+        
+        if (card) {
+            console.log(`Adding classes to ${itemType} card`);
+            card.classList.add('gesture-active', 'purchased');
+            setTimeout(() => {
+                card.classList.remove('gesture-active', 'purchased');
+                console.log(`Removed classes from ${itemType} card`);
+            }, 700);
+        } else {
+            console.log(`❌ ERROR: Card not found for ${itemType}`);
+        }
+        
+        // Execute item action
+        if (itemType === 'food') {
+            const pos = palmPos || { x: 0.5, y: 0.3 }; // default center if clicked
+            spawnFoodAtHand(pos.x, pos.y);
+            console.log('🍴 Food dispensed!');
+        } else if (itemType === 'hat') {
+            if (buyItemForFish(itemType)) {
+                playSoundHat();
+                console.log('🎩 Hat purchased!');
+            }
+        } else if (itemType === 'glasses') {
+            if (buyItemForFish(itemType)) {
+                playSoundGlasses();
+                console.log('🕶️ Glasses purchased!');
+            }
+        } else if (itemType === 'babyFish') {
+            // Spawn baby fish and deduct coins from richest fish
+            const richestFish = fishes.filter(f => f.coins !== undefined).sort((a,b) => b.coins - a.coins)[0];
+            if (richestFish && richestFish.coins >= 10) {
+                richestFish.coins -= 10;
+                const newFish = new Fish();
+                fishes.push(newFish);
+                console.log(`🐠 Baby fish born! Parent spent 10 coins. Total fish: ${fishes.length}`);
+            } else {
+                const needed = 10;
+                const available = richestFish ? richestFish.coins : 0;
+                console.log(`❌ No fish has 10 coins for baby! Richest has: ${available}`);
+                showToast(`❌ Need 10 coins! Richest fish has ${available}🪙`);
+            }
+        }
+    }
+
+    async function initHandDetection() {
+        try {
+            console.log('🎬 initHandDetection starting...');
+            
+            console.log('📹 Requesting camera permission...');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480 } });
+            console.log('✅ Camera permission granted!');
+            
+            video.srcObject = stream;
+            await new Promise(r => video.onloadedmetadata = r);
+            cameraActive = true;
+            debugInfo.cameraPermission = 'granted';
+            console.log('✅ Video metadata loaded, camera active!');
+
+            console.log('🤖 Initializing MediaPipe Hands...');
+            handDetector = new window.Hands({
+                locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
+            });
+            handDetector.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+            console.log('✅ MediaPipe Hands initialized!');
+
+            let logCounter = 0;
+            let firstDetection = true;
+
+            handDetector.onResults(results => {
+                hands = [];
+                latestHandLandmarks = [];
+                logCounter++;
+
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    if (firstDetection) {
+                        console.log('🎉 FIRST HAND DETECTION!');
+                        firstDetection = false;
+                    }
+                    if (logCounter % 30 === 0) {
+                        console.log(`🖐️ HANDS DETECTED: ${results.multiHandLandmarks.length}`);
+                    }
+                    
+                    results.multiHandLandmarks.forEach((landmarks, handIdx) => {
+                        latestHandLandmarks.push(landmarks);
+                        
+                        // Get finger positions
+                        const indexTip = landmarks[8];
+                        const middleTip = landmarks[12];
+                        const ringTip = landmarks[16];
+                        const pinkyTip = landmarks[20];
+                        const thumbTip = landmarks[4];
+                        const palmPos = landmarks[9];
+                        
+                        // Calculate distances
+                        const distIndex = Math.hypot(indexTip.x - palmPos.x, indexTip.y - palmPos.y);
+                        const distMiddle = Math.hypot(middleTip.x - palmPos.x, middleTip.y - palmPos.y);
+                        const distRing = Math.hypot(ringTip.x - palmPos.x, ringTip.y - palmPos.y);
+                        const distPinky = Math.hypot(pinkyTip.x - palmPos.x, pinkyTip.y - palmPos.y);
+                        const distThumb = Math.hypot(thumbTip.x - palmPos.x, thumbTip.y - palmPos.y);
+                        const avgDist = (distIndex + distMiddle + distRing + distPinky) / 4;
+                        
+                        if (logCounter % 15 === 0) {
+                            console.log(`Hand ${handIdx}: I:${distIndex.toFixed(3)} M:${distMiddle.toFixed(3)} R:${distRing.toFixed(3)} P:${distPinky.toFixed(3)} T:${distThumb.toFixed(3)}`);
+                        }
+                        
+                        // Gesture detection - CHECK MOST SPECIFIC FIRST
+                        let gesture = null;
+                        
+                        // THREE FINGERS: index + middle + ring extended, pinky curled
+                        if (distIndex > 0.10 && distMiddle > 0.10 && distRing > 0.10 && distPinky < 0.09) {
+                            gesture = 'babyFish';
+                            console.log(`👋 THREE FINGERS detected!`);
+                        }
+                        // THUMBS UP: thumb extended, all fingers curled (easiest!)
+                        else if (distThumb > 0.12 && distIndex < 0.10 && distMiddle < 0.10 && distRing < 0.10 && distPinky < 0.10) {
+                            gesture = 'glasses';
+                            console.log(`👍 THUMBS UP detected! (T:${distThumb.toFixed(3)} I:${distIndex.toFixed(3)} M:${distMiddle.toFixed(3)} R:${distRing.toFixed(3)} P:${distPinky.toFixed(3)})`);
+                        }
+                        // PEACE SIGN: index + middle extended, ring + pinky curled
+                        else if (distIndex > 0.10 && distMiddle > 0.10 && distRing < 0.12 && distPinky < 0.12) {
+                            gesture = 'hat';
+                            console.log(`✌️ PEACE SIGN detected! (I:${distIndex.toFixed(3)} M:${distMiddle.toFixed(3)} R:${distRing.toFixed(3)} P:${distPinky.toFixed(3)})`);
+                        }
+                        // OPEN PALM: all 4 fingers extended (least specific - check LAST)
+                        else if (distIndex > 0.09 && distMiddle > 0.09 && distRing > 0.09 && distPinky > 0.09) {
+                            gesture = 'food';
+                            console.log(`🖐️ OPEN PALM detected!`);
+                        }
+                        
+                        if (gesture) {
+                            triggerShopItem(gesture, palmPos);
+                        }
+                        
+                        hands.push({
+                            x: palmPos.x,
+                            y: palmPos.y,
+                            gesture: gesture
+                        });
+                    });
+                } else {
+                    if (logCounter % 60 === 0) {
+                        console.log('⏳ Waiting for hands...');
+                    }
+                }
+            });
+
+            async function detectFrame() {
+                if (cameraActive && video.readyState === video.HAVE_ENOUGH_DATA) {
+                    try { await handDetector.send({ image: video }); } catch(e) {
+                        console.error('Detection error:', e.message);
+                    }
+                }
+                requestAnimationFrame(detectFrame);
+            }
+            console.log('🔄 Starting detection loop...');
+            detectFrame();
+        } catch(err) {
+            debugInfo.cameraPermission = 'denied';
+            console.error('❌ Camera error:', err.message);
+            console.warn('Camera not available:', err.message);
+        }
+    }
+
+    // ================================================================
+    // HAND-TRIGGERED FEEDING
+    // ================================================================
+    function spawnFoodAtHand(palmX, palmY) {
+        // Flip X coordinate (camera is mirrored)
+        const flippedX = 1 - palmX;
+        const screenX = flippedX * canvas.width;
+        const screenY = palmY * canvas.height;
+        const spreadRadius = 40;
+
+        console.log(`📍 spawnFoodAtHand called: screen pos (${screenX.toFixed(0)}, ${screenY.toFixed(0)})`);
+
+        for (let i = 0; i < 5; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * spreadRadius;
+            const foodX = screenX + Math.cos(angle) * distance;
+            const foodY = screenY + Math.sin(angle) * distance;
+
+            if (foodX > 0 && foodX < canvas.width && foodY > 0 && foodY < canvas.height) {
+                foods.push(new Food(foodX, foodY));
+                console.log(`🍴 Food spawned at (${foodX.toFixed(0)}, ${foodY.toFixed(0)}) - Total food: ${foods.length}`);
+            }
+        }
+    }
+
+    // ================================================================
+    // BACKGROUND
+    // ================================================================
+    let debugInfo = {
+        mediapiloaded: false,
+        cameraPermission: 'pending',
+        handsDetected: 0,
+        lastUpdate: Date.now()
+    };
+    
+    function drawBackground() {
+        const tl = Math.min(feedCounter/300,1);
+        const g = ctx.createLinearGradient(0,0,0,canvas.height);
+        const r1=Math.max(30-tl*20,10),g1=Math.max(60-tl*40,20),b1=Math.max(120-tl*60,60);
+        g.addColorStop(0,  `rgba(${r1},${g1},${b1},${0.3+tl*0.3})`);
+        g.addColorStop(0.5,`rgba(${Math.max(20-tl*15,5)},${Math.max(50-tl*35,15)},${Math.max(100-tl*50,50)},${0.4+tl*0.2})`);
+        g.addColorStop(1,  `rgba(${Math.max(10-tl*8,2)},${Math.max(30-tl*25,5)},${Math.max(60-tl*40,20)},${0.5+tl*0.2})`);
+        ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+        try { drawAllCorals(); } catch(e){}
+        if (feedCounter>50) { ctx.fillStyle=`rgba(100,120,100,${(tl-0.17)*0.3})`; ctx.fillRect(0,0,canvas.width,canvas.height); }
+        ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='16px Arial'; ctx.textAlign='right';
+        ctx.fillText(`Feeds: ${feedCounter}`,canvas.width-20,canvas.height-60);
+        ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='12px Arial';
+        const st=feedCounter>250?'Full Degradation':feedCounter>150?'Residue Accumulating':feedCounter>50?'Economy Emerging':'Natural Ecosystem';
+        ctx.fillText(st,canvas.width-20,canvas.height-40);
+    }
+
+    let restingItems = [];
+
+    function drawItemShape(type, color) {
+        if (type==='hat') {
+            ctx.fillStyle=color;
+            ctx.beginPath(); ctx.ellipse(0,0,14,4,0,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
+            ctx.beginPath(); ctx.ellipse(0,0,14,4,0,0,Math.PI*2); ctx.stroke();
+            ctx.fillStyle=color;
+            ctx.beginPath(); ctx.roundRect(-8,-14,16,14,2); ctx.fill();
+            ctx.fillStyle='rgba(0,0,0,0.35)';
+            ctx.beginPath(); ctx.rect(-8,-4,16,3); ctx.fill();
+            const cg=ctx.createLinearGradient(-8,0,8,0);
+            cg.addColorStop(0,'rgba(0,0,0,0.2)'); cg.addColorStop(1,'rgba(255,255,255,0.05)');
+            ctx.fillStyle=cg; ctx.beginPath(); ctx.roundRect(-8,-14,16,14,2); ctx.fill();
+        }
+        if (type==='glasses') {
+            ctx.setLineDash([]);
+            ctx.strokeStyle=color; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.arc(0,-2,8,0,Math.PI*2); ctx.stroke();
+            ctx.fillStyle='rgba(150,230,255,0.18)';
+            ctx.beginPath(); ctx.arc(0,-2,8,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='rgba(255,255,255,0.5)';
+            ctx.beginPath(); ctx.arc(-3,-6,2.5,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle=color; ctx.lineWidth=1.5;
+            ctx.setLineDash([3,3]);
+            ctx.beginPath(); ctx.moveTo(5,4); ctx.lineTo(12,14); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
+
+    // Coral snag zones — mid-height points where items can catch
+    function getCoralSnagPoints() {
+        return [
+            { x: 80,               y: canvas.height - 75 },
+            { x: 200,              y: canvas.height - 80 },
+            { x: 140,              y: canvas.height - 60 },
+            { x: canvas.width-80,  y: canvas.height - 75 },
+            { x: canvas.width-140, y: canvas.height - 60 },
+            { x: canvas.width-200, y: canvas.height - 80 },
+        ];
+    }
+
+    function drawSinkingItems() {
+        const snagPoints = getCoralSnagPoints();
+
+        for (let i=sinkingItems.length-1;i>=0;i--) {
+            const item=sinkingItems[i];
+            item.y += item.sinkSpeed;
+            item.sinkSpeed = Math.min(item.sinkSpeed + 0.02, 2.5);
+            item.rot = (item.rot||0) + 0.018;
+
+            // Check if passing near a coral snag point (only if not already snagged)
+            if (!item.snagged) {
+                for (const snag of snagPoints) {
+                    const dx = Math.abs(item.x - snag.x);
+                    const dy = item.y - snag.y;
+                    // within horizontal range and just passed the snag height
+                    if (dx < 55 && dy >= 0 && dy < 12 && Math.random() < 0.35) {
+                        item.snagged = true;
+                        restingItems.push({
+                            type:   item.type,
+                            color:  item.color,
+                            x:      snag.x + (Math.random()-0.5)*28,
+                            y:      snag.y + (Math.random()-0.5)*12,
+                            rot:    (Math.random()-0.5)*0.7,
+                            tangled: true   // flag so we can draw a little string
+                        });
+                        sinkingItems.splice(i,1);
+                        break;
+                    }
+                }
+                if (item.snagged) continue;
+            }
+
+            // Hit the seabed
+            if (item.y >= canvas.height - 32) {
+                restingItems.push({
+                    type:  item.type,
+                    color: item.color,
+                    x:     item.x + (Math.random()-0.5)*20,
+                    y:     canvas.height - 18 - Math.random()*18,
+                    rot:   (Math.random()-0.5)*1.0
+                });
+                sinkingItems.splice(i,1);
+                continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha=1;
+            ctx.translate(item.x, item.y);
+            ctx.rotate(item.rot);
+            drawItemShape(item.type, item.color);
+            ctx.restore();
+        }
+    }
+
+    function drawRestingItems() {
+        restingItems.forEach(item => {
+            ctx.save();
+            ctx.globalAlpha = 0.82;
+            ctx.translate(item.x, item.y);
+            ctx.rotate(item.rot);
+
+            // If tangled on coral, draw a little string above it
+            if (item.tangled) {
+                ctx.strokeStyle = 'rgba(180,160,120,0.7)';
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([3,4]);
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                // wavy string going up ~30px
+                ctx.quadraticCurveTo(8, -25, 2, -42);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            drawItemShape(item.type, item.color);
+            ctx.restore();
+        });
+    }
+
+    function checkFishFoodCollision() {
+        fishes.forEach(fish => {
+            for (let j=foods.length-1;j>=0;j--) {
+                const food=foods[j];
+                if (Math.hypot(fish.x-food.x,fish.y-food.y) < fish.size+food.size) {
+                    foods.splice(j,1);
+                    fish.coins += 1;  // 1 food = 1 coin
+                    // floating +1 text
+                    floatingTexts.push({ x:fish.x, y:fish.y - fish.size*2, text:'+1🪙', life:1.0, color:'#ffd700' });
+                    const ms=4, cs=Math.hypot(fish.speedX,fish.speedY);
+                    if (cs>0) { fish.speedX=(fish.speedX/cs)*Math.min(cs*1.5,ms); fish.speedY=(fish.speedY/cs)*Math.min(cs*1.5,ms); }
+                    playSoundFoodDispense();  // Coin ding when fish eats
+                }
+            }
+        });
+    }
+
+    function drawFloatingTexts() {
+        for (let i = floatingTexts.length-1; i >= 0; i--) {
+            const ft = floatingTexts[i];
+            ft.y -= 0.8;
+            ft.life -= 0.018;
+            if (ft.life <= 0) { floatingTexts.splice(i,1); continue; }
+            ctx.save();
+            ctx.globalAlpha = ft.life;
+            ctx.font = 'bold 13px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = ft.color;
+            ctx.fillText(ft.text, ft.x, ft.y);
+            ctx.restore();
+        }
+    }
+
+    // ================================================================
+    // MAIN LOOP
+    // ================================================================
+    function animate() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        drawBackground();
+
+        if (bubbles.length<maxBubbles && Math.random()<0.3) bubbles.push(new Bubble());
+        bubbles = bubbles.filter(b=>!b.isOffScreen());
+        bubbles.forEach(b=>{ b.update(); b.draw(); });
+
+        drawSeaweedParticles();
+
+        foods = foods.filter(f=>!f.isOffScreen());
+        foods.forEach(f=>{ f.update(); f.draw(); });
+
+        drawRestingItems();
+        fishes.forEach(f=>{ f.update(); f.draw(); });
+        checkFishFoodCollision();
+        drawSinkingItems();
+        drawFloatingTexts();
+
+        ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='14px Arial'; ctx.textAlign='left';
+        ctx.fillText(`Food: ${foods.length}  Fish: ${fishes.length}  Bubbles: ${bubbles.length}`,20,canvas.height-20);
+
+        // Draw hand skeleton on top of everything, every frame
+        latestHandLandmarks.forEach(lm => drawHandSkeleton(lm));
+
+        requestAnimationFrame(animate);
+    }
+
+    function initFishes(cfg={}) {
+        fishes=[];
+        for (let i=0;i<(cfg.count||8);i++) fishes.push(new Fish(cfg.fishConfig||{}));
+    }
+
+    // Click canvas to drop food
+    canvas.addEventListener('click', e => foods.push(new Food(e.clientX, e.clientY)));
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    console.log('🚀 Aquarium initializing...');
+    initRockPositions();
+    initCoralPositions();
+    initFishes();
+    initSeaweedParticles();
+    animate();
+
+    console.log('⏳ Waiting for MediaPipe library to load...');
+    const waitForMediaPipe = setInterval(() => {
+        if (window.Hands) { 
+            console.log('✅ MediaPipe Hands loaded! Starting hand detection...');
+            debugInfo.mediapiloaded = true;
+            clearInterval(waitForMediaPipe); 
+            initHandDetection(); 
+        } else {
+            console.log('⏳ Still waiting for MediaPipe...');
+        }
+    }, 100);
+    </script>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- UNDERWATER AMBIENCE — Web Audio API synthesis -->
+    <!-- Activated on first user interaction (autoplay policy) -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <script>
+    (function() {
+      let _ac = null;
+      function getAC() {
+        if (!_ac) {
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) {
+              console.error('❌ Web Audio API not supported');
+              return null;
+            }
+            _ac = new AudioCtx();
+            console.log('✅ AudioContext created - State:', _ac.state);
+          } catch (e) {
+            console.error('❌ Failed to create AudioContext:', e.message);
+            return null;
+          }
+        }
+        return _ac;
+      }
+
+      function startUnderwaterAmbience() {
+        try {
+          const ac = getAC();
+          if (!ac) {
+            console.error('❌ Cannot start ambience - no AudioContext');
+            return;
+          }
+          console.log('🌊 Starting underwater ambience synthesis...');
+          const master = ac.createGain();
+        master.gain.setValueAtTime(0, ac.currentTime);
+        master.gain.linearRampToValueAtTime(0.55, ac.currentTime + 4.0);
+        master.connect(ac.destination);
+
+        // ── Deep water pressure hum ──
+        (function makeDeepHum() {
+          const osc1=ac.createOscillator(), osc2=ac.createOscillator();
+          const lfo=ac.createOscillator(), lfoG=ac.createGain();
+          const g=ac.createGain(), lp=ac.createBiquadFilter();
+          lp.type='lowpass'; lp.frequency.value=180;
+          osc1.type='sine'; osc1.frequency.value=42;
+          osc2.type='sine'; osc2.frequency.value=47.3;
+          lfo.type='sine'; lfo.frequency.value=0.07; lfoG.gain.value=6;
+          lfo.connect(lfoG); lfoG.connect(osc1.frequency); lfoG.connect(osc2.frequency);
+          g.gain.value=0.28;
+          osc1.connect(lp); osc2.connect(lp); lp.connect(g); g.connect(master);
+          osc1.start(); osc2.start(); lfo.start();
+        })();
+
+        // ── Resonant water column ──
+        (function makeWaterColumn() {
+          const osc=ac.createOscillator(), lfo=ac.createOscillator();
+          const lfoG=ac.createGain(), bp=ac.createBiquadFilter(), g=ac.createGain();
+          osc.type='sawtooth'; osc.frequency.value=28;
+          lfo.type='sine'; lfo.frequency.value=0.13; lfoG.gain.value=3;
+          bp.type='bandpass'; bp.frequency.value=110; bp.Q.value=8; g.gain.value=0.12;
+          lfo.connect(lfoG); lfoG.connect(bp.frequency);
+          osc.connect(bp); bp.connect(g); g.connect(master);
+          osc.start(); lfo.start();
+        })();
+
+        // ── Underwater pink noise wash ──
+        (function makeWash() {
+          const len=ac.sampleRate*6, buf=ac.createBuffer(1,len,ac.sampleRate);
+          const d=buf.getChannelData(0);
+          let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+          for(let i=0;i<len;i++){
+            const wh=Math.random()*2-1;
+            b0=0.99886*b0+wh*0.0555179; b1=0.99332*b1+wh*0.0750759;
+            b2=0.96900*b2+wh*0.1538520; b3=0.86650*b3+wh*0.3104856;
+            b4=0.55000*b4+wh*0.5329522; b5=-0.7616*b5-wh*0.0168980;
+            d[i]=(b0+b1+b2+b3+b4+b5+b6+wh*0.5362)*0.11; b6=wh*0.115926;
+          }
+          const src=ac.createBufferSource(); src.buffer=buf; src.loop=true;
+          const lp1=ac.createBiquadFilter(); lp1.type='lowpass'; lp1.frequency.value=320;
+          const lp2=ac.createBiquadFilter(); lp2.type='lowpass'; lp2.frequency.value=180;
+          const hp=ac.createBiquadFilter();  hp.type='highpass'; hp.frequency.value=18;
+          const lfo=ac.createOscillator(); lfo.type='sine'; lfo.frequency.value=0.04;
+          const lfoG=ac.createGain(); lfoG.gain.value=0.06;
+          const g=ac.createGain(); g.gain.value=0.18;
+          lfo.connect(lfoG); lfoG.connect(g.gain);
+          src.connect(hp); hp.connect(lp1); lp1.connect(lp2); lp2.connect(g); g.connect(master);
+          src.start(); lfo.start();
+        })();
+
+        // ── Random rising bubble pops — 3 streams ──
+        function scheduleBubble() {
+          setTimeout(function() {
+            const now=ac.currentTime, f=280+Math.random()*320, dur=0.08+Math.random()*0.14;
+            const osc=ac.createOscillator(), g=ac.createGain(), lp=ac.createBiquadFilter();
+            lp.type='lowpass'; lp.frequency.value=1600; osc.type='sine';
+            osc.frequency.setValueAtTime(f,now);
+            osc.frequency.exponentialRampToValueAtTime(f*1.7,now+dur*0.5);
+            osc.frequency.exponentialRampToValueAtTime(f*0.5,now+dur);
+            g.gain.setValueAtTime(0.001,now);
+            g.gain.linearRampToValueAtTime(0.09+Math.random()*0.06,now+0.008);
+            g.gain.exponentialRampToValueAtTime(0.001,now+dur);
+            osc.connect(lp); lp.connect(g); g.connect(master);
+            osc.start(now); osc.stop(now+dur+0.05);
+            const nlen=Math.floor(ac.sampleRate*dur*0.4);
+            const nbuf=ac.createBuffer(1,nlen,ac.sampleRate);
+            const nd=nbuf.getChannelData(0); for(let i=0;i<nlen;i++) nd[i]=Math.random()*2-1;
+            const nsrc=ac.createBufferSource(); nsrc.buffer=nbuf;
+            const nbp=ac.createBiquadFilter(); nbp.type='bandpass'; nbp.frequency.value=f*1.2; nbp.Q.value=4;
+            const ng=ac.createGain();
+            ng.gain.setValueAtTime(0.04,now); ng.gain.exponentialRampToValueAtTime(0.001,now+dur*0.3);
+            nsrc.connect(nbp); nbp.connect(ng); ng.connect(master);
+            nsrc.start(now); nsrc.stop(now+dur*0.4+0.05);
+            scheduleBubble();
+          }, (Math.random()*3.2+0.4)*1000);
+        }
+        scheduleBubble(); scheduleBubble(); scheduleBubble();
+
+        // ── Distant low rumble ──
+        (function makeRumble() {
+          const osc=ac.createOscillator(), lfo=ac.createOscillator();
+          const lfoG=ac.createGain(), g=ac.createGain(), lp=ac.createBiquadFilter();
+          lp.type='lowpass'; lp.frequency.value=60;
+          osc.type='sine'; osc.frequency.value=22;
+          lfo.type='sine'; lfo.frequency.value=0.03; lfoG.gain.value=8; g.gain.value=0.22;
+          lfo.connect(lfoG); lfoG.connect(osc.frequency);
+          osc.connect(lp); lp.connect(g); g.connect(master);
+          osc.start(); lfo.start();
+        })();
+
+        // ── Occasional metallic creak ──
+        function scheduleCreak() {
+          setTimeout(function() {
+            const now=ac.currentTime, f=180+Math.random()*120;
+            const osc=ac.createOscillator(), g=ac.createGain(), bp=ac.createBiquadFilter();
+            bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=12;
+            osc.type='sawtooth'; osc.frequency.value=f;
+            osc.frequency.linearRampToValueAtTime(f*(0.85+Math.random()*0.3), now+1.2);
+            g.gain.setValueAtTime(0.001,now);
+            g.gain.linearRampToValueAtTime(0.06,now+0.3);
+            g.gain.linearRampToValueAtTime(0.001,now+1.8);
+            osc.connect(bp); bp.connect(g); g.connect(master);
+            osc.start(now); osc.stop(now+2.0);
+            scheduleCreak();
+          }, 6000+Math.random()*12000);
+        }
+        scheduleCreak();
+
+        console.log('🌊 Underwater ambience activated');
+      } catch (e) {
+        console.error('❌ Error in startUnderwaterAmbience:', e.message, e);
+      }
+      }
+
+      // Initialize immediately on page load
+      let started = false;
+      function tryStart() {
+        if (started) return;
+        started = true;
+        console.log('🌊 Starting underwater ambience...');
+        startUnderwaterAmbience();
+      }
+      
+      console.log('🎮 Aquarium loaded - attempting immediate audio initialization');
+      
+      // Try to start immediately when page loads
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          setTimeout(tryStart, 100);
+        });
+      } else {
+        setTimeout(tryStart, 100);
+      }
+      
+      // Backup: also start on any user interaction (for autoplay policy compliance)
+      document.addEventListener('click',     tryStart, { once: true });
+      document.addEventListener('keydown',   tryStart, { once: true });
+      document.addEventListener('mousemove', tryStart, { once: true });
+      document.addEventListener('touchstart',tryStart, { once: true });
+    })();
+    </script>
+</body>
+</html>
