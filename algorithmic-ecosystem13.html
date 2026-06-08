@@ -1926,224 +1926,207 @@
     }
 
     // ================================================================
-    // OCTOPUS — crawls around coral bases on the seabed
+    // OCTOPUS — cute cartoon style, crawls along seabed between coral waypoints
     // ================================================================
     let octopus = null;
 
-    // Waypoints: coral / rock x positions near the seabed the octopus visits
     function getOctopusWaypoints() {
         return [
-            canvas.width * 0.08,
-            canvas.width * 0.20,
-            canvas.width * 0.35,
+            canvas.width * 0.10,
+            canvas.width * 0.22,
+            canvas.width * 0.36,
             canvas.width * 0.50,
-            canvas.width * 0.65,
-            canvas.width * 0.80,
-            canvas.width * 0.92,
+            canvas.width * 0.64,
+            canvas.width * 0.78,
+            canvas.width * 0.90,
         ];
     }
 
     class Octopus {
         constructor() {
-            this.size   = 22;
-            this.color  = `hsl(${265 + Math.random()*30},60%,28%)`;
-            this.y      = canvas.height - this.size * 0.6;
-            this.phase  = 0;
-            this.blinkTimer  = 150 + Math.floor(Math.random()*180);
+            this.s     = 30;                         // size unit
+            this.y     = canvas.height - this.s * 0.7;
+            this.phase = Math.random() * Math.PI * 2;
+            this.blinkTimer  = 150 + Math.floor(Math.random() * 200);
             this.blinking    = false;
             this.blinkFrame  = 0;
-
-            // Waypoint navigation
-            const wps   = getOctopusWaypoints();
-            this.wpIdx  = Math.floor(Math.random() * wps.length);
-            this.x      = wps[this.wpIdx];
-            this._pickNextWaypoint();
-
-            // Arm tip positions — 8 arms each tracked as a segment chain
-            this.arms = Array.from({length:8}, (_,i) => this._initArm(i));
-        }
-
-        _initArm(i) {
-            const angle = Math.PI * (0.15 + (i / 7) * 0.7); // fan: ~27° to ~153° (spread along bottom)
-            return {
-                angle,
-                phase: (i / 8) * Math.PI * 2,   // stagger wave
-                // 4 segments per arm
-                segs: Array.from({length:4}, (_,s) => ({
-                    x: this.x + Math.cos(angle) * s * this.size * 0.7,
-                    y: this.y  + Math.sin(angle) * s * this.size * 0.5,
-                }))
-            };
-        }
-
-        _pickNextWaypoint() {
-            const wps = getOctopusWaypoints();
-            let next;
-            do { next = Math.floor(Math.random() * wps.length); } while (next === this.wpIdx && wps.length > 1);
-            this.wpIdx   = next;
-            this.targetX = wps[next];
+            // arm wave phases — staggered per arm
+            this.armPhases = Array.from({length:8}, (_,i) => i * (Math.PI*2/8));
+            // waypoint nav
+            const wps  = getOctopusWaypoints();
+            this.wpIdx = Math.floor(Math.random() * wps.length);
+            this.x     = wps[this.wpIdx];
+            this.targetX = this.x;
             this.pausing = false;
             this.pauseTimer = 0;
+            this._pickNext();
+        }
+
+        _pickNext() {
+            const wps = getOctopusWaypoints();
+            let n;
+            do { n = Math.floor(Math.random() * wps.length); } while (n === this.wpIdx && wps.length > 1);
+            this.wpIdx   = n;
+            this.targetX = wps[n];
+            this.pausing = false;
         }
 
         update() {
-            this.phase += 0.045;
+            this.phase += 0.04;
+            this.armPhases = this.armPhases.map((p,i) => p + 0.055 + i*0.003);
 
-            // Blink
-            this.blinkTimer--;
-            if (this.blinkTimer <= 0) { this.blinking = true; this.blinkFrame = 0; this.blinkTimer = 140 + Math.floor(Math.random()*200); }
-            if (this.blinking) { this.blinkFrame++; if (this.blinkFrame > 12) this.blinking = false; }
+            // blink
+            if (--this.blinkTimer <= 0) { this.blinking = true; this.blinkFrame = 0; this.blinkTimer = 120 + Math.floor(Math.random()*220); }
+            if (this.blinking && ++this.blinkFrame > 12) this.blinking = false;
 
-            // Move toward waypoint
             if (this.pausing) {
-                this.pauseTimer--;
-                if (this.pauseTimer <= 0) this._pickNextWaypoint();
-            } else {
-                const dx = this.targetX - this.x;
-                if (Math.abs(dx) < 2) {
-                    // Arrived — pause at the coral
-                    this.pausing    = true;
-                    this.pauseTimer = 80 + Math.floor(Math.random() * 140);
-                } else {
-                    this.x += Math.sign(dx) * (0.5 + Math.abs(dx) * 0.012);
-                }
+                if (--this.pauseTimer <= 0) this._pickNext();
+                return;
             }
-
-            // Update arm segments — each follows the previous with a wave
-            this.arms.forEach((arm, ai) => {
-                arm.phase += 0.03;
-                const s  = this.size;
-                const moving = !this.pausing;
-
-                // Base angle fans from body, flips with direction of travel
-                const dir    = this.targetX > this.x ? 1 : -1;
-                const spread = (ai / 7 - 0.5) * Math.PI * 0.85; // –76° to +76°
-                const baseA  = Math.PI * 0.5 + spread;           // pointing downward/outward
-
-                arm.segs[0].x = this.x;
-                arm.segs[0].y = this.y;
-
-                for (let si = 1; si < arm.segs.length; si++) {
-                    const prev = arm.segs[si - 1];
-                    const segLen  = s * (0.72 - si * 0.06);       // taper
-                    const wave    = Math.sin(arm.phase + si * 0.9) * (moving ? 0.32 : 0.12);
-                    const angle   = baseA + wave;
-                    arm.segs[si].x = prev.x + Math.cos(angle) * segLen;
-                    arm.segs[si].y = Math.min(canvas.height - 4, prev.y + Math.sin(angle) * segLen * 0.55);
-                }
-            });
+            const dx = this.targetX - this.x;
+            if (Math.abs(dx) < 1.5) {
+                this.pausing = true;
+                this.pauseTimer = 90 + Math.floor(Math.random() * 150);
+            } else {
+                this.x += Math.sign(dx) * Math.min(Math.abs(dx) * 0.015 + 0.4, 1.8);
+            }
         }
 
         draw() {
-            const s = this.size;
+            const { x, y, s, phase, armPhases, blinking, blinkFrame } = this;
+            const moving = !this.pausing;
             ctx.save();
 
-            // ── Draw 8 tentacles BEHIND body ──
-            this.arms.forEach((arm, ai) => {
-                const segs = arm.segs;
-                if (segs.length < 2) return;
+            // ── 8 tentacles (drawn behind body) ──
+            // fan from center-bottom of body, spread left-right
+            for (let i = 0; i < 8; i++) {
+                const t       = i / 7;                      // 0..1
+                const spread  = (t - 0.5) * Math.PI * 0.9; // fan angle
+                const baseA   = Math.PI * 0.5 + spread;     // downward fan
+                const wave1   = Math.sin(armPhases[i]) * (moving ? 0.28 : 0.10);
+                const wave2   = Math.sin(armPhases[i] + 1.1) * (moving ? 0.32 : 0.12);
 
-                // Smooth curve through segment points
+                const bx = x + Math.cos(baseA) * s * 0.38;
+                const by = y + Math.sin(baseA) * s * 0.28;
+
+                const mid1x = bx + Math.cos(baseA + wave1) * s * 0.95;
+                const mid1y = Math.min(canvas.height - 2, by + Math.sin(baseA + wave1) * s * 0.55);
+
+                const tipx  = mid1x + Math.cos(baseA + wave2) * s * 0.9;
+                const tipy  = Math.min(canvas.height - 2, mid1y + Math.sin(baseA + wave2) * s * 0.45);
+
+                // Main arm stroke — thick
                 ctx.beginPath();
-                ctx.moveTo(segs[0].x, segs[0].y);
-                for (let si = 1; si < segs.length; si++) {
-                    const prev = segs[si-1];
-                    const curr = segs[si];
-                    const mx   = (prev.x + curr.x) / 2;
-                    const my   = (prev.y + curr.y) / 2;
-                    ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
-                }
-                const last = segs[segs.length-1];
-                ctx.lineTo(last.x, last.y);
-
-                // Thickness tapers from base to tip
-                const baseWidth = s * 0.28;
-                ctx.lineWidth   = baseWidth;
-                ctx.strokeStyle = this.color;
+                ctx.moveTo(bx, by);
+                ctx.quadraticCurveTo(mid1x, mid1y, tipx, tipy);
+                ctx.strokeStyle = '#7c3fa0';
+                ctx.lineWidth   = s * 0.38 * (1 - t * 0.15);
                 ctx.lineCap     = 'round';
                 ctx.lineJoin    = 'round';
                 ctx.stroke();
 
-                // Thinner lighter overlay for taper effect
+                // Lighter inner highlight stripe
                 ctx.beginPath();
-                ctx.moveTo(segs[1].x, segs[1].y);
-                for (let si = 2; si < segs.length; si++) {
-                    const prev = segs[si-1];
-                    const curr = segs[si];
-                    ctx.quadraticCurveTo(prev.x, prev.y, (prev.x+curr.x)/2, (prev.y+curr.y)/2);
-                }
-                ctx.lineTo(last.x, last.y);
-                ctx.lineWidth   = s * 0.1;
-                ctx.strokeStyle = lightenColor(this.color, 18);
+                ctx.moveTo(bx, by);
+                ctx.quadraticCurveTo(mid1x, mid1y, tipx, tipy);
+                ctx.strokeStyle = '#b57fdc';
+                ctx.lineWidth   = s * 0.12;
                 ctx.stroke();
 
-                // Suckers along tentacle
-                ctx.fillStyle = lightenColor(this.color, 30);
-                for (let si = 1; si < segs.length; si++) {
-                    const prev = segs[si-1];
-                    const curr = segs[si];
-                    const mx = (prev.x + curr.x) / 2;
-                    const my = (prev.y + curr.y) / 2;
-                    const r  = s * (0.06 - si * 0.01);
-                    if (r > 1) {
-                        ctx.beginPath();
-                        ctx.arc(mx, my, r, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
+                // Sucker dots
+                const suckers = 3;
+                for (let d = 0; d < suckers; d++) {
+                    const dt  = (d + 0.5) / suckers;
+                    const sx  = bx  + (mid1x - bx)  * dt;
+                    const sy  = by  + (mid1y - by)   * dt;
+                    const sr  = s * (0.075 - d * 0.012);
+                    ctx.beginPath(); ctx.arc(sx, sy, Math.max(sr, 2), 0, Math.PI*2);
+                    ctx.fillStyle = '#c490e0'; ctx.fill();
                 }
-            });
+            }
 
-            // ── Mantle (body) — drawn on top of arm bases ──
-            ctx.translate(this.x, this.y);
-
-            const mg = ctx.createRadialGradient(-s*0.1, -s*0.4, s*0.05, 0, -s*0.15, s*0.75);
-            mg.addColorStop(0, lightenColor(this.color, 32));
-            mg.addColorStop(1, this.color);
-            ctx.fillStyle = mg;
+            // ── Body — round chubby ellipse ──
             ctx.beginPath();
-            ctx.ellipse(0, -s*0.2, s*0.52, s*0.68, 0, 0, Math.PI*2);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.ellipse(x, y - s*0.18, s*0.72, s*0.65, 0, 0, Math.PI*2);
+            ctx.fillStyle = '#9b5fc0'; ctx.fill();
 
-            // Mantle dome top
+            // Head dome (slightly lighter)
             ctx.beginPath();
-            ctx.ellipse(0, -s*0.75, s*0.28, s*0.2, 0, 0, Math.PI*2);
-            ctx.fillStyle = lightenColor(this.color, 14); ctx.fill();
+            ctx.ellipse(x, y - s*0.62, s*0.55, s*0.48, 0, 0, Math.PI*2);
+            ctx.fillStyle = '#a966d0'; ctx.fill();
 
-            // Skin spots
-            ctx.fillStyle = 'rgba(0,0,0,0.1)';
-            [[-s*0.17,-s*0.22],[s*0.19,-s*0.08],[-s*0.06,-s*0.5],[s*0.14,-s*0.42]].forEach(([dx,dy]) => {
-                ctx.beginPath(); ctx.arc(dx, dy, s*0.09, 0, Math.PI*2); ctx.fill();
-            });
+            // Belly highlight
+            ctx.beginPath();
+            ctx.ellipse(x, y - s*0.05, s*0.42, s*0.33, 0, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(181,127,220,0.4)'; ctx.fill();
+
+            const sad = pollution >= 0.4;
+
+            // Rosy cheeks — disappear when sad
+            if (!sad) {
+                ctx.fillStyle = 'rgba(232,123,189,0.45)';
+                ctx.beginPath(); ctx.ellipse(x - s*0.42, y - s*0.1, s*0.2, s*0.12, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(x + s*0.42, y - s*0.1, s*0.2, s*0.12, 0, 0, Math.PI*2); ctx.fill();
+            }
 
             // ── Eyes ──
-            [-1,1].forEach(side => {
-                const ex = side * s * 0.26, ey = -s * 0.16;
-                ctx.beginPath(); ctx.arc(ex, ey, s*0.16, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(255,245,215,0.92)'; ctx.fill();
-                if (!this.blinking) {
-                    // Horizontal slit pupil
+            const eyeOffX = s * 0.27, eyeY = y - s * 0.28;
+            [-1, 1].forEach(side => {
+                const ex = x + side * eyeOffX;
+
+                // Sad: drooping inner brow
+                if (sad) {
                     ctx.beginPath();
-                    ctx.ellipse(ex, ey, s*0.05, s*0.11, 0, 0, Math.PI*2);
-                    ctx.fillStyle = '#180808'; ctx.fill();
-                    ctx.beginPath(); ctx.arc(ex+s*0.04, ey-s*0.06, s*0.045, 0, Math.PI*2);
-                    ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fill();
-                } else {
-                    ctx.beginPath();
-                    ctx.moveTo(ex - s*0.13, ey); ctx.lineTo(ex + s*0.13, ey);
-                    ctx.strokeStyle = '#180808'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.moveTo(ex - side*s*0.16, eyeY - s*0.28);
+                    ctx.lineTo(ex + side*s*0.08, eyeY - s*0.18);
+                    ctx.strokeStyle = '#6b3580'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke();
                 }
-                ctx.beginPath(); ctx.arc(ex, ey, s*0.16, 0, Math.PI*2);
-                ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+
+                // white
+                ctx.beginPath(); ctx.ellipse(ex, eyeY, s*0.18, s*0.2, 0, 0, Math.PI*2);
+                ctx.fillStyle = 'white'; ctx.fill();
+                if (!blinking) {
+                    // pupil — looks down when sad
+                    const pupilDY = sad ? s*0.06 : s*0.02;
+                    ctx.beginPath(); ctx.ellipse(ex + side*s*0.03, eyeY + pupilDY, s*0.1, s*0.12, 0, 0, Math.PI*2);
+                    ctx.fillStyle = '#1a0a2e'; ctx.fill();
+                    // shine
+                    ctx.beginPath(); ctx.arc(ex + side*s*0.03 - s*0.04, eyeY + pupilDY - s*0.05, s*0.04, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
+                    // tear drop when sad
+                    if (sad) {
+                        ctx.beginPath();
+                        ctx.moveTo(ex, eyeY + s*0.2);
+                        ctx.bezierCurveTo(ex - s*0.06, eyeY + s*0.3, ex + s*0.06, eyeY + s*0.38, ex, eyeY + s*0.42);
+                        ctx.fillStyle = 'rgba(100,180,255,0.75)'; ctx.fill();
+                    }
+                } else {
+                    const bh = Math.max(0.08, 1 - blinkFrame/5) * s*0.2;
+                    ctx.beginPath(); ctx.ellipse(ex, eyeY, s*0.18, bh, 0, 0, Math.PI*2);
+                    ctx.fillStyle = 'white'; ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(ex - s*0.18, eyeY); ctx.lineTo(ex + s*0.18, eyeY);
+                    ctx.strokeStyle = '#6b3580'; ctx.lineWidth = 2; ctx.stroke();
+                }
+                // eye outline
+                ctx.beginPath(); ctx.ellipse(ex, eyeY, s*0.18, s*0.2, 0, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.stroke();
             });
+
+            // Smile or frown
+            ctx.beginPath();
+            if (sad) {
+                // frown — arc flipped upward
+                ctx.arc(x, eyeY + s*0.44, s*0.14, Math.PI + 0.15, -0.15);
+            } else {
+                ctx.arc(x, eyeY + s*0.22, s*0.14, 0.15, Math.PI - 0.15);
+            }
+            ctx.strokeStyle = '#6b3580'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke();
 
             ctx.restore();
         }
     }
 
-    function initOctopus() {
-        octopus = new Octopus();
-    }
+    function initOctopus() { octopus = new Octopus(); }
 
     function updateDrawOctopus() {
         if (!octopus) return;
@@ -2151,7 +2134,7 @@
         octopus.draw();
     }
 
-    function initFishes(cfg={}) {
+        function initFishes(cfg={}) {
         fishes=[];
         for (let i=0;i<(cfg.count||8);i++) fishes.push(new Fish(cfg.fishConfig||{}));
     }
