@@ -382,14 +382,14 @@
             <div class="gesture-hand">✌️</div>
             <div class="gesture-text">
                 <div class="gesture-action">PEACE SIGN</div>
-                <div class="gesture-desc">Get hat (5🪙)</div>
+                <div class="gesture-desc">Get hat (5💰)</div>
             </div>
         </div>
         <div class="gesture-item">
             <div class="gesture-hand">👍</div>
             <div class="gesture-text">
                 <div class="gesture-action">THUMBS UP</div>
-                <div class="gesture-desc">Get glasses (5🪙)</div>
+                <div class="gesture-desc">Get glasses (5💰)</div>
             </div>
         </div>
     </div>
@@ -398,17 +398,17 @@
         <div class="card" data-item="food">
             <div class="card-icon">🍴</div>
             <div class="card-name">Food</div>
-            <div class="card-price">🪙 1</div>
+            <div class="card-price">💰 1</div>
         </div>
         <div class="card" data-item="hat">
             <div class="card-icon">🎩</div>
             <div class="card-name">Hat</div>
-            <div class="card-price">🪙 5</div>
+            <div class="card-price">💰 5</div>
         </div>
         <div class="card" data-item="glasses">
             <div class="card-icon">🕶️</div>
             <div class="card-name">Glasses</div>
-            <div class="card-price">🪙 5</div>
+            <div class="card-price">💰 5</div>
         </div>
     </div>
 
@@ -446,6 +446,9 @@
         canvas.height = window.innerHeight;
         initRockPositions();
         initCoralPositions();
+        initPearlShells();
+        initCrabs();
+        initOctopus();
     });
 
     let fishes = [], foods = [], hands = [], bubbles = [], floatingTexts = [];
@@ -492,38 +495,23 @@
 
     // ================================================================
     // GESTURE RECOGNITION
-    // Gestures mapped to shop items:
-    //   Open palm (all 5 extended)  → food
-    //   Peace sign (index + middle) → hat
-    //   Shaka (thumb + pinky)       → glasses
     // ================================================================
-    const GESTURE_COOLDOWN_MS = 1500; // prevent rapid re-trigger
-    let lastGestureFired = {};        // itemType → timestamp
+    const GESTURE_COOLDOWN_MS = 1500;
+    let lastGestureFired = {};
 
     function isFingerExtended(lm, tipIdx, pipIdx) {
-        // tip must be above (lower y) its PIP joint
         return lm[tipIdx].y < lm[pipIdx].y;
     }
 
     function classifyGesture(lm) {
-        const thumb  = lm[4].x  < lm[3].x;  // thumb tip left of knuckle (mirrored)
-        // For mirrored video (1-x), check thumb differently
-        // We'll use raw landmark x: thumb extended = tip far from palm
         const thumbExt  = Math.abs(lm[4].x - lm[0].x) > 0.1;
         const indexExt  = isFingerExtended(lm, 8, 6);
         const middleExt = isFingerExtended(lm, 12, 10);
         const ringExt   = isFingerExtended(lm, 16, 14);
         const pinkyExt  = isFingerExtended(lm, 20, 18);
 
-        const extCount = [indexExt, middleExt, ringExt, pinkyExt].filter(Boolean).length;
-
-        // Open palm: all 4 fingers extended (thumb doesn't matter)
         if (indexExt && middleExt && ringExt && pinkyExt) return 'food';
-
-        // Peace sign: index + middle extended, ring + pinky curled
         if (indexExt && middleExt && !ringExt && !pinkyExt) return 'hat';
-
-        // Shaka (call me): thumb + pinky extended, index + middle + ring curled
         if (thumbExt && !indexExt && !middleExt && !ringExt && pinkyExt) return 'glasses';
 
         return null;
@@ -557,26 +545,20 @@
         master.gain.setValueAtTime(0.4, now);
         master.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
         master.connect(ac.destination);
-        
-        // Bright coin/ding sound - satisfying and musical
         const osc = ac.createOscillator();
         const g = ac.createGain();
-        
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);  // High C
+        osc.frequency.setValueAtTime(800, now);
         osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-        
         g.gain.setValueAtTime(0.001, now);
         g.gain.linearRampToValueAtTime(0.6, now + 0.02);
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-        
         osc.connect(g);
         g.connect(master);
         osc.start(now);
         osc.stop(now + 0.36);
     }
 
-    // Eerie shimmer when a fish becomes a jellyfish
     function playSoundTransform() {
         const ac = getAudioContext(); if (!ac) return;
         const now = ac.currentTime;
@@ -598,7 +580,6 @@
         });
     }
 
-    // Soft descending blip when a fish starves out
     function playSoundDeath() {
         const ac = getAudioContext(); if (!ac) return;
         const now = ac.currentTime;
@@ -617,6 +598,26 @@
         osc.start(now); osc.stop(now + 0.6);
     }
 
+    function playSoundKill() {
+        const ac = getAudioContext(); if (!ac) return;
+        const now = ac.currentTime;
+
+        // Descending evil blip — low sinister laugh feel
+        const notes = [520, 380, 240, 140];
+        notes.forEach((freq, i) => {
+            const osc = ac.createOscillator();
+            const env = ac.createGain();
+            const t = now + i * 0.09;
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, t);
+            env.gain.setValueAtTime(0.0, t);
+            env.gain.linearRampToValueAtTime(0.28, t + 0.01);
+            env.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            osc.connect(env); env.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.12);
+        });
+    }
+
     function playSoundHat() {
         const ac = getAudioContext();
         if (!ac) return;
@@ -625,19 +626,14 @@
         master.gain.setValueAtTime(0.35, now);
         master.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
         master.connect(ac.destination);
-        
-        // Bright ascending ding - celebratory
         const osc = ac.createOscillator();
         const g = ac.createGain();
-        
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(523, now);  // C5
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);  // A5
-        
+        osc.frequency.setValueAtTime(523, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
         g.gain.setValueAtTime(0.001, now);
         g.gain.linearRampToValueAtTime(0.5, now + 0.02);
         g.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-        
         osc.connect(g);
         g.connect(master);
         osc.start(now);
@@ -652,24 +648,18 @@
         master.gain.setValueAtTime(0.3, now);
         master.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
         master.connect(ac.destination);
-        
-        // Clean, sharp metallic click - satisfying frame on nose
         const osc = ac.createOscillator();
         const g = ac.createGain();
         const hp = ac.createBiquadFilter();
-        
         hp.type = 'highpass';
         hp.frequency.value = 2800;
         hp.Q.value = 1.5;
-        
         osc.type = 'square';
-        osc.frequency.setValueAtTime(880, now);  // A5
+        osc.frequency.setValueAtTime(880, now);
         osc.frequency.exponentialRampToValueAtTime(1760, now + 0.05);
-        
         g.gain.setValueAtTime(0.001, now);
         g.gain.linearRampToValueAtTime(0.4, now + 0.01);
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        
         osc.connect(hp);
         hp.connect(g);
         g.connect(master);
@@ -678,16 +668,12 @@
     }
 
     function triggerGestureItem(itemType) {
-        // Visual feedback on card
         const card = document.querySelector(`.card[data-item="${itemType}"]`);
         if (card) {
             card.classList.add('gesture-active', 'purchased');
             setTimeout(() => card.classList.remove('gesture-active', 'purchased'), 700);
         }
-
-        // Execute item action
         if (itemType === 'food') {
-            // Scatter food across the top of the tank
             const count = 5 + Math.floor(Math.random() * 5);
             for (let i = 0; i < count; i++) {
                 const fx = Math.random() * canvas.width;
@@ -695,7 +681,6 @@
                 foods.push(new Food(fx, fy));
             }
         } else {
-            // Hat or Glasses
             if (buyItemForFish(itemType)) {
                 if (itemType === 'hat') playSoundHat();
                 else if (itemType === 'glasses') playSoundGlasses();
@@ -703,7 +688,6 @@
         }
     }
 
-    // Clear active card highlights when no gesture
     let lastGestureType = null;
     function updateGestureUI(gesture) {
         if (gesture !== lastGestureType) {
@@ -716,7 +700,6 @@
         }
     }
 
-    // Mouse click still works
     document.querySelectorAll('.card').forEach(card => {
         card.addEventListener('click', () => triggerShopItem(card.dataset.item));
     });
@@ -724,12 +707,10 @@
     function buyItemForFish(itemType) {
         const affordable = fishes.filter(f => f.coins >= SHOP_PRICES[itemType]);
         if (affordable.length > 0) {
-            // pick the richest fish to spend
             affordable.sort((a,b) => b.coins - a.coins);
             affordable[0].buyItem(itemType);
             return true;
         }
-        // No fish can afford it — show toast
         showToast(`💸 No fish has enough coins for a ${itemType}!`);
         return false;
     }
@@ -917,6 +898,113 @@
         ctx.moveTo(cx-10,cy+6); ctx.quadraticCurveTo(cx+20,cy-3,cx+45,cy-6);
         ctx.stroke(); ctx.restore();
     }
+    // ================================================================
+    // PEARL SHELLS
+    // ================================================================
+    let pearlShells = [];
+    function initPearlShells() {
+        pearlShells = [];
+        const positions = [
+            { x: 0.08, open: false }, { x: 0.18, open: true  },
+            { x: 0.30, open: false }, { x: 0.42, open: true  },
+            { x: 0.55, open: false }, { x: 0.65, open: true  },
+            { x: 0.78, open: false }, { x: 0.88, open: true  },
+        ];
+        positions.forEach(p => {
+            pearlShells.push({
+                x: p.x * canvas.width,
+                y: canvas.height - 10,
+                size: 10 + Math.random() * 8,
+                open: p.open,
+                // open shells glow softly — each pearl has a unique hue
+                pearlHue: 180 + Math.random() * 60,
+                glowPhase: Math.random() * Math.PI * 2,
+            });
+        });
+    }
+
+    function drawPearlShell(shell) {
+        const { x, y, size, open, pearlHue, glowPhase } = shell;
+        const glow = 0.5 + 0.5 * Math.sin(reefTime * 1.5 + glowPhase);
+        ctx.save();
+        ctx.translate(x, y);
+
+        // ── Shell body — two halves ──
+        const shellColor1 = '#c8b89a';
+        const shellColor2 = '#a89070';
+
+        if (open) {
+            // Bottom half (flat on seabed)
+            ctx.beginPath();
+            ctx.ellipse(0, 0, size, size * 0.35, 0, 0, Math.PI);
+            const g1 = ctx.createLinearGradient(0, 0, 0, size * 0.35);
+            g1.addColorStop(0, '#d4c4a8'); g1.addColorStop(1, '#8a7055');
+            ctx.fillStyle = g1; ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+            // Top half (open, tilted up)
+            ctx.save();
+            ctx.rotate(-Math.PI * 0.38);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, size, size * 0.35, 0, 0, Math.PI);
+            const g2 = ctx.createLinearGradient(0, 0, 0, size * 0.35);
+            g2.addColorStop(0, '#e8d8bc'); g2.addColorStop(1, '#a08860');
+            ctx.fillStyle = g2; ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 0.8; ctx.stroke();
+            // Inner nacre shimmer
+            ctx.beginPath();
+            ctx.ellipse(0, size * 0.1, size * 0.7, size * 0.2, 0, 0, Math.PI);
+            ctx.fillStyle = `rgba(255,245,235,0.35)`; ctx.fill();
+            ctx.restore();
+
+            // Pearl sitting inside
+            const pr = size * 0.28;
+            const px = size * 0.15, py = -size * 0.08;
+            // Pearl glow
+            ctx.shadowBlur = 10 + glow * 8;
+            ctx.shadowColor = `hsla(${pearlHue},80%,75%,0.9)`;
+            // Pearl body
+            const pg = ctx.createRadialGradient(px - pr * 0.3, py - pr * 0.3, pr * 0.1, px, py, pr);
+            pg.addColorStop(0, '#ffffff');
+            pg.addColorStop(0.4, `hsla(${pearlHue},60%,88%,1)`);
+            pg.addColorStop(1, `hsla(${pearlHue},40%,65%,1)`);
+            ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2);
+            ctx.fillStyle = pg; ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Pearl shine
+            ctx.beginPath(); ctx.arc(px - pr * 0.3, py - pr * 0.32, pr * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fill();
+
+        } else {
+            // Closed shell — simple half-ellipse
+            ctx.beginPath();
+            ctx.ellipse(0, 0, size, size * 0.4, 0, Math.PI, Math.PI * 2);
+            const gc = ctx.createLinearGradient(0, -size * 0.4, 0, 0);
+            gc.addColorStop(0, '#d4c4a8'); gc.addColorStop(1, '#8a7055');
+            ctx.fillStyle = gc; ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.8; ctx.stroke();
+            // Ridge lines
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 0.6;
+            for (let r = 0; r < 3; r++) {
+                const rs = size * (0.35 + r * 0.22);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, rs, rs * 0.4, 0, Math.PI, Math.PI * 2);
+                ctx.stroke();
+            }
+            // Tiny hint of pearl glow peeking from the seam
+            ctx.beginPath();
+            ctx.ellipse(0, 0, size * 0.3, size * 0.05, 0, Math.PI, Math.PI * 2);
+            ctx.fillStyle = `hsla(${pearlHue},70%,85%,${0.3 + glow * 0.3})`; ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function drawPearlShells() {
+        pearlShells.forEach(s => drawPearlShell(s));
+    }
+
     function drawAllCorals() {
         reefTime += 0.01;
         drawAquariumRocks(); drawSunkenBoat();
@@ -931,6 +1019,7 @@
         drawTallHairgrass(canvas.width-60,canvas.height-5,12,140); drawTallHairgrass(canvas.width-120,canvas.height-5,10,120);
         ctx.fillStyle='#3a4454'; ctx.beginPath(); ctx.arc(canvas.width-60,canvas.height-10,12,0,Math.PI*2); ctx.fill();
         ctx.fillStyle='#2d3b42'; ctx.beginPath(); ctx.arc(canvas.width-120,canvas.height-10,10,0,Math.PI*2); ctx.fill();
+        drawPearlShells();
     }
 
     // ================================================================
@@ -946,17 +1035,14 @@
             this.coins=0; this.itemWorn=null; this.itemColor=`hsl(${Math.random()*360},100%,50%)`;
             this.hunger=HUNGER_MAX; this.starving=false; this.dead=false;
             this.targetPrey=null; this.becameJelly=false; this.eaten=false;
-            this.itemTimer=0;   // frames left on a worn item before it wears out
+            this.itemTimer=0;
         }
         update() {
-            // ── item wear-out: worn items decay and sink to the seabed ──
             const eff = this.itemWorn ? ITEM_EFFECT[this.itemWorn] : null;
             if (this.itemWorn) {
                 this.itemTimer--;
-                if (this.itemTimer <= 0) dropItem(this);   // worn out → becomes litter, edge lost
+                if (this.itemTimer <= 0) dropItem(this);
             }
-
-            // ── hunger decay (faster when the water is polluted; slower under a hat) ──
             const hatMult = eff ? eff.hungerMult : 1;
             this.hunger -= HUNGER_DECAY * (1 + pollution * POLLUTION_HUNGER) * hatMult;
             if (this.hunger <= 0) { this.dead = true; return; }
@@ -965,22 +1051,21 @@
             this.tailOffset += this.tailDirection*0.3;
             if (Math.abs(this.tailOffset)>5) this.tailDirection*=-1;
 
-            // ── choose a target ──
             this.targetFood = null; this.targetPrey = null;
             if (foods.length>0) this.findNearestFood();
-            if (this.starving) this.findNearestPrey();   // starving → hunt smaller fish too
+            if (this.starving) this.findNearestPrey();
 
-            // pick whichever target is closer (food still rescues a starving fish)
             let tx=null, ty=null;
             const fd = this.targetFood ? Math.hypot(this.targetFood.x-this.x,this.targetFood.y-this.y) : Infinity;
             const pd = this.targetPrey ? Math.hypot(this.targetPrey.x-this.x,this.targetPrey.y-this.y) : Infinity;
+
             if (fd <= pd && this.targetFood) { tx=this.targetFood.x; ty=this.targetFood.y; this.targetPrey=null; }
             else if (this.targetPrey)        { tx=this.targetPrey.x; ty=this.targetPrey.y; this.targetFood=null; }
 
             if (tx!==null) {
                 const dx=tx-this.x, dy=ty-this.y, d=Math.sqrt(dx*dx+dy*dy);
                 this.angle=Math.atan2(dy,dx);
-                const chase = this.starving ? 4 : 3;   // predators are faster
+                const chase = this.starving ? 4 : 3;
                 if (d>5) { this.speedX=(dx/d)*chase*this.speedMultiplier; this.speedY=(dy/d)*chase*this.speedMultiplier; }
             } else {
                 this.angle=Math.atan2(this.speedY,this.speedX);
@@ -993,7 +1078,6 @@
             if (this.y<=this.size||this.y>=canvas.height-this.size) { this.speedY*=-1; this.y=Math.max(this.size,Math.min(canvas.height-this.size,this.y)); }
         }
         findNearestFood() {
-            // a fish only notices food within its sense range — glasses widen it dramatically
             const mult = (this.itemWorn && ITEM_EFFECT[this.itemWorn]) ? ITEM_EFFECT[this.itemWorn].senseMult : 1;
             const range = BASE_SENSE * mult;
             let nd=range,nf=null;
@@ -1001,11 +1085,10 @@
             this.targetFood=nf;
         }
         findNearestPrey() {
-            // hunt the nearest fish meaningfully smaller than me
             let nd=Infinity,np=null;
             fishes.forEach(f=>{
                 if (f===this || f.dead) return;
-                if (f.size >= this.size*0.92) return;   // only smaller fish are prey
+                if (f.size >= this.size*0.92) return;
                 const d=Math.hypot(f.x-this.x,f.y-this.y);
                 if (d<nd){nd=d;np=f;}
             });
@@ -1014,20 +1097,16 @@
         draw() {
             ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.angle);
 
-            // Body
             ctx.fillStyle=this.color; ctx.globalAlpha=1;
             ctx.beginPath(); ctx.ellipse(0,0,this.size,this.size*0.6,0,0,Math.PI*2); ctx.fill();
 
-            // Tail
             ctx.beginPath(); ctx.moveTo(-this.size*0.8,0);
             ctx.lineTo(-this.size*1.3,-this.size*0.5+this.tailOffset);
             ctx.lineTo(-this.size*1.3, this.size*0.5+this.tailOffset); ctx.closePath(); ctx.fill();
 
-            // Eye
             ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(this.size*0.3,-this.size*0.15,this.size*0.15,0,Math.PI*2); ctx.fill();
             ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(this.size*0.35,-this.size*0.17,this.size*0.08,0,Math.PI*2); ctx.fill();
 
-            // Fins
             ctx.fillStyle=this.color; ctx.globalAlpha=0.7;
             ctx.beginPath(); ctx.ellipse(0, this.size*0.4,this.size*0.4,this.size*0.2, Math.PI*0.2,0,Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(0,-this.size*0.4,this.size*0.4,this.size*0.2,-Math.PI*0.2,0,Math.PI*2); ctx.fill();
@@ -1036,72 +1115,61 @@
             if (this.itemWorn==='hat') {
                 ctx.globalAlpha=1;
                 const s = this.size;
-                const hx = s * 0.1;   // shifted toward head
-                const hy = -s * 0.6;  // sit on top of fish
+                const hx = s * 0.1;
+                const hy = -s * 0.6;
 
-                // Brim (wide flat ellipse)
                 ctx.fillStyle = this.itemColor;
                 ctx.beginPath();
                 ctx.ellipse(hx, hy, s*0.52, s*0.13, 0, 0, Math.PI*2); ctx.fill();
-                // Brim shadow/edge
                 ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
                 ctx.beginPath(); ctx.ellipse(hx, hy, s*0.52, s*0.13, 0, 0, Math.PI*2); ctx.stroke();
 
-                // Crown (tall rectangle-ish shape)
                 const cw = s*0.32, ch = s*0.55;
                 ctx.fillStyle = this.itemColor;
                 ctx.beginPath();
                 ctx.roundRect(hx - cw/2, hy - ch, cw, ch, s*0.04);
                 ctx.fill();
-                // Crown shading (left darker strip for 3D)
                 const cg = ctx.createLinearGradient(hx - cw/2, 0, hx + cw/2, 0);
                 cg.addColorStop(0,'rgba(0,0,0,0.3)'); cg.addColorStop(0.4,'rgba(0,0,0,0)'); cg.addColorStop(1,'rgba(0,0,0,0.15)');
                 ctx.fillStyle=cg;
                 ctx.beginPath(); ctx.roundRect(hx - cw/2, hy - ch, cw, ch, s*0.04); ctx.fill();
 
-                // Hat band (thin stripe near brim)
                 ctx.fillStyle='rgba(0,0,0,0.4)';
                 ctx.beginPath(); ctx.rect(hx - cw/2, hy - s*0.14, cw, s*0.1); ctx.fill();
 
-                // Crown top edge line
                 ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1;
                 ctx.beginPath(); ctx.roundRect(hx - cw/2, hy - ch, cw, ch, s*0.04); ctx.stroke();
             }
 
-            // === GLASSES (monocle — one lens over the single eye) ===
+            // === GLASSES ===
             if (this.itemWorn==='glasses') {
                 ctx.globalAlpha=1;
                 const s = this.size;
-                // Match exactly where the eye is drawn
                 const ex = s*0.3,  ey = -s*0.15;
-                const r  = s*0.22;   // slightly larger than the eyeball
+                const r  = s*0.22;
 
                 const frameColor = this.itemColor;
 
-                // Lens tint
                 ctx.fillStyle = 'rgba(150,230,255,0.22)';
                 ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI*2); ctx.fill();
 
-                // Lens frame
                 ctx.strokeStyle = frameColor; ctx.lineWidth = s*0.08;
                 ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI*2); ctx.stroke();
 
-                // Chain/arm dangling toward the tail
                 ctx.beginPath();
                 ctx.moveTo(ex - r, ey + r*0.3);
                 ctx.quadraticCurveTo(ex - r - s*0.2, ey + s*0.25, ex - r - s*0.35, ey + s*0.35);
                 ctx.strokeStyle = frameColor; ctx.lineWidth = s*0.04;
                 ctx.setLineDash([s*0.06, s*0.05]); ctx.stroke();
-                ctx.setLineDash([]);  // always reset
+                ctx.setLineDash([]);
 
-                // Lens shine
                 ctx.fillStyle='rgba(255,255,255,0.5)';
                 ctx.beginPath(); ctx.arc(ex - r*0.25, ey - r*0.28, r*0.2, 0, Math.PI*2); ctx.fill();
             }
 
             ctx.restore();
 
-            // ── Predator cue: pulsing red ring when starving ──
+            // Predator cue
             if (this.starving) {
                 const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.012);
                 ctx.save();
@@ -1113,7 +1181,7 @@
                 ctx.restore();
             }
 
-            // ── Hunger bar (sits just above the body) ──
+            // Hunger bar
             {
                 const barW = this.size*1.6, barH = 3;
                 const bx = this.x - barW/2, by = this.y - this.size*1.15;
@@ -1128,15 +1196,14 @@
                 ctx.restore();
             }
 
-            // Coin label — drawn in world space so it stays upright
+            // Coin label
             ctx.save();
             const fs = Math.max(10, this.size * 0.7);
             ctx.font = `bold ${fs}px Arial`;
             ctx.textAlign = 'center';
             const labelY = this.y - this.size * 1.7;
-            const label = `🪙 ${this.coins}`;
+            const label = `💰 ${this.coins}`;
             const tw = ctx.measureText(label).width;
-            // pill background colour by wealth
             ctx.fillStyle = this.coins >= 10 ? 'rgba(255,200,0,0.88)'
                           : this.coins >= 5  ? 'rgba(160,160,255,0.82)'
                           :                    'rgba(255,255,255,0.55)';
@@ -1150,18 +1217,17 @@
         buyItem(type) {
             const cost = SHOP_PRICES[type];
             if (this.coins >= cost) {
-                dropItem(this);                                   // discard whatever was worn → instant seabed litter
+                dropItem(this);
                 this.coins -= cost;
                 this.itemWorn = type;
                 this.itemTimer = ITEM_LIFESPAN[type] || 1300;
                 this.itemColor = `hsl(${Math.random()*360},100%,50%)`;
-                lastBuyFrame = frameCount;                        // resets the tank's recovery clock
-                floatingTexts.push({ x:this.x, y:this.y - this.size*2, text:`-${cost}🪙`, life:1.0, color:'#ff6644' });
+                lastBuyFrame = frameCount;
+                floatingTexts.push({ x:this.x, y:this.y - this.size*2, text:`-${cost}💰`, life:1.0, color:'#ff6644' });
             }
         }
     }
 
-    // Discard a fish's worn item — it sinks to the seabed as litter, and the survival edge is lost.
     function dropItem(fish) {
         if (!fish.itemWorn) return;
         sinkingItems.push({ type:fish.itemWorn, x:fish.x, y:fish.y, color:fish.itemColor, sinkSpeed:Math.random()*0.5+0.3 });
@@ -1170,32 +1236,30 @@
     }
 
     // ================================================================
-    // JELLYFISH — terminal state. Inert, drifts, accumulates forever.
-    // A fish that survives by eating another fish becomes one of these.
+    // JELLYFISH
     // ================================================================
     class Jelly {
         constructor(x, y) {
             this.x = x; this.y = y;
-            this.size = 12 + Math.random()*10;            // bell size
-            this.speedY = 0.15 + Math.random()*0.2;       // slow upward drift
-            this.pulse = Math.random()*Math.PI*2;         // unique breathing rhythm
-            this.drift = Math.random()*Math.PI*2;         // sway phase
-            this.driftX = (Math.random()-0.5)*0.15;       // slow horizontal wander
-            this.hue = 184 + Math.random()*20;            // electric cyan, slight variation
+            this.size = 12 + Math.random()*10;
+            this.speedY = 0.15 + Math.random()*0.2;
+            this.pulse = Math.random()*Math.PI*2;
+            this.drift = Math.random()*Math.PI*2;
+            this.driftX = (Math.random()-0.5)*0.15;
+            this.hue = 184 + Math.random()*20;
         }
         update() {
-            // float up until it pools near the surface, then bob gently (accumulates, never resets)
             if (this.y > this.size*1.6) this.y -= this.speedY;
             else this.y += Math.sin(this.pulse)*0.15;
-            this.pulse += 0.04;                           // bell pulsing speed
-            this.drift += 0.005;                          // sway speed
+            this.pulse += 0.04;
+            this.drift += 0.005;
             this.x += this.driftX;
             if (this.x < this.size || this.x > canvas.width - this.size) this.driftX *= -1;
         }
         draw() {
             ctx.save();
-            const currentX = this.x + Math.sin(this.drift)*20;       // slow left/right sway
-            const scaleY = 1 + Math.sin(this.pulse)*0.25;            // swimming expand/contract
+            const currentX = this.x + Math.sin(this.drift)*20;
+            const scaleY = 1 + Math.sin(this.pulse)*0.25;
             const scaleX = 1 - Math.sin(this.pulse)*0.15;
             const glow = `hsl(${this.hue},100%,60%)`;
 
@@ -1203,7 +1267,6 @@
             ctx.shadowColor = glow;
             ctx.strokeStyle = `hsla(${this.hue},100%,60%,0.7)`;
 
-            // 1. wavy tentacles (behind the bell)
             ctx.lineWidth = 1.2;
             const tentacleCount = 5;
             for (let i=0;i<tentacleCount;i++){
@@ -1218,14 +1281,12 @@
                 ctx.stroke();
             }
 
-            // 2. transparent glowing bell
             ctx.fillStyle = `hsla(${this.hue},100%,50%,0.25)`;
             ctx.beginPath();
             ctx.ellipse(currentX, this.y, this.size*scaleX, this.size*0.9*scaleY, 0, Math.PI, 0);
             ctx.quadraticCurveTo(currentX, this.y - this.size*0.3, currentX - this.size*scaleX, this.y);
             ctx.fill();
 
-            // 3. bright inner core
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
             ctx.beginPath();
             ctx.ellipse(currentX, this.y - this.size*0.3*scaleY, this.size*0.4*scaleX, this.size*0.2*scaleY, 0, 0, Math.PI*2);
@@ -1235,17 +1296,14 @@
         }
     }
 
-    // A starving fish that catches a smaller fish → becomes a jellyfish.
     function transformToJelly(fish) {
         jellies.push(new Jelly(fish.x, fish.y));
-        fish.dead = true; fish.becameJelly = true;   // its coins simply vanish
+        fish.dead = true; fish.becameJelly = true;
         floatingTexts.push({ x:fish.x, y:fish.y - fish.size*1.6, text:'🪼', life:1.2, color:'#aee' });
-        // a few bubbles puff out of the transformation
         for (let i=0;i<5;i++) { const b=new Bubble(); b.x=fish.x+(Math.random()-0.5)*20; b.y=fish.y; bubbles.push(b); }
         playSoundTransform();
     }
 
-    // Predation pass — runs each frame. Starving fish eat smaller fish.
     function checkPredation() {
         for (let i=0;i<fishes.length;i++){
             const pred = fishes[i];
@@ -1255,9 +1313,10 @@
                 const prey = fishes[k];
                 if (prey.dead || prey.size >= pred.size*0.92) continue;
                 if (Math.hypot(pred.x-prey.x, pred.y-prey.y) < pred.size + prey.size*0.5) {
-                    prey.dead = true; prey.eaten = true;                 // prey is consumed
+                    prey.dead = true; prey.eaten = true;
                     floatingTexts.push({ x:prey.x, y:prey.y, text:'✕', life:0.8, color:'#ff5a3c' });
-                    transformToJelly(pred);                               // predator ascends to jelly
+                    playSoundKill();
+                    transformToJelly(pred);
                     break;
                 }
             }
@@ -1280,7 +1339,7 @@
     }
 
     // ================================================================
-    // HAND SKELETON (no finger cursor dot)
+    // HAND SKELETON
     // ================================================================
     const HAND_CONNECTIONS = [
         [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
@@ -1315,7 +1374,7 @@
     }
 
     // ================================================================
-    // PANELS TOGGLE (Gesture Guide Only)
+    // PANELS TOGGLE
     // ================================================================
     function togglePanels() {
         const gestureGuide = document.querySelector('.gesture-guide');
@@ -1325,189 +1384,100 @@
         const isHidden = gestureGuide.classList.contains('hidden');
 
         if (isHidden) {
-            // Show hand commands → hide the pollution bar
             gestureGuide.classList.remove('hidden');
             showPanelsBtn.classList.remove('visible');
             if (pollBar) pollBar.classList.remove('visible');
         } else {
-            // Hide hand commands → reveal the pollution bar
             gestureGuide.classList.add('hidden');
             showPanelsBtn.classList.add('visible');
             if (pollBar) pollBar.classList.add('visible');
         }
     }
 
-    // Add keyboard shortcut (H key to toggle gesture guide)
     document.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'h') {
-            togglePanels();
-        }
+        if (e.key.toLowerCase() === 'h') togglePanels();
     });
 
     // ================================================================
     // HAND DETECTION
     // ================================================================
-    let lastPalmFeedTime = 0;
     let lastGestureTime = {};
-    const GESTURE_COOLDOWN = 1000; // ms between same gestures
+    const GESTURE_COOLDOWN = 1000;
 
     function triggerShopItem(itemType, palmPos) {
         const now = Date.now();
         const lastTime = lastGestureTime[itemType] || 0;
-        
-        // Cooldown check (only for gestures, not clicks)
-        if (palmPos && now - lastTime < GESTURE_COOLDOWN) {
-            return;
-        }
-        if (palmPos) {
-            lastGestureTime[itemType] = now;
-        }
-        
-        console.log(`🎯 Shop item triggered: ${itemType}`);
-        
-        // Highlight card
+        if (palmPos && now - lastTime < GESTURE_COOLDOWN) return;
+        if (palmPos) lastGestureTime[itemType] = now;
+
         const card = document.querySelector(`.card[data-item="${itemType}"]`);
-        console.log(`Looking for card: .card[data-item="${itemType}"] - Found: ${card ? '✅ YES' : '❌ NO'}`);
-        
         if (card) {
-            console.log(`Adding classes to ${itemType} card`);
             card.classList.add('gesture-active', 'purchased');
-            setTimeout(() => {
-                card.classList.remove('gesture-active', 'purchased');
-                console.log(`Removed classes from ${itemType} card`);
-            }, 700);
-        } else {
-            console.log(`❌ ERROR: Card not found for ${itemType}`);
+            setTimeout(() => card.classList.remove('gesture-active', 'purchased'), 700);
         }
-        
-        // Execute item action
+
         if (itemType === 'food') {
-            const pos = palmPos || { x: 0.5, y: 0.3 }; // default center if clicked
+            const pos = palmPos || { x: 0.5, y: 0.3 };
             spawnFoodAtHand(pos.x, pos.y);
-            console.log('🍴 Food dispensed!');
         } else if (itemType === 'hat') {
-            if (buyItemForFish(itemType)) {
-                playSoundHat();
-                console.log('🎩 Hat purchased!');
-            }
+            if (buyItemForFish(itemType)) playSoundHat();
         } else if (itemType === 'glasses') {
-            if (buyItemForFish(itemType)) {
-                playSoundGlasses();
-                console.log('🕶️ Glasses purchased!');
-            }
+            if (buyItemForFish(itemType)) playSoundGlasses();
         }
     }
 
     async function initHandDetection() {
         try {
-            console.log('🎬 initHandDetection starting...');
-            
-            console.log('📹 Requesting camera permission...');
             const stream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480 } });
-            console.log('✅ Camera permission granted!');
-            
             video.srcObject = stream;
             await new Promise(r => video.onloadedmetadata = r);
             cameraActive = true;
-            debugInfo.cameraPermission = 'granted';
-            console.log('✅ Video metadata loaded, camera active!');
 
-            console.log('🤖 Initializing MediaPipe Hands...');
             handDetector = new window.Hands({
                 locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
             });
             handDetector.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
-            console.log('✅ MediaPipe Hands initialized!');
-
-            let logCounter = 0;
-            let firstDetection = true;
 
             handDetector.onResults(results => {
                 hands = [];
                 latestHandLandmarks = [];
-                logCounter++;
 
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                    if (firstDetection) {
-                        console.log('🎉 FIRST HAND DETECTION!');
-                        firstDetection = false;
-                    }
-                    if (logCounter % 30 === 0) {
-                        console.log(`🖐️ HANDS DETECTED: ${results.multiHandLandmarks.length}`);
-                    }
-                    
-                    results.multiHandLandmarks.forEach((landmarks, handIdx) => {
+                    results.multiHandLandmarks.forEach((landmarks) => {
                         latestHandLandmarks.push(landmarks);
-                        
-                        // Get finger positions
-                        const indexTip = landmarks[8];
-                        const middleTip = landmarks[12];
-                        const ringTip = landmarks[16];
-                        const pinkyTip = landmarks[20];
-                        const thumbTip = landmarks[4];
-                        const palmPos = landmarks[9];
-                        
-                        // Calculate distances
-                        const distIndex = Math.hypot(indexTip.x - palmPos.x, indexTip.y - palmPos.y);
-                        const distMiddle = Math.hypot(middleTip.x - palmPos.x, middleTip.y - palmPos.y);
-                        const distRing = Math.hypot(ringTip.x - palmPos.x, ringTip.y - palmPos.y);
-                        const distPinky = Math.hypot(pinkyTip.x - palmPos.x, pinkyTip.y - palmPos.y);
-                        const distThumb = Math.hypot(thumbTip.x - palmPos.x, thumbTip.y - palmPos.y);
-                        const avgDist = (distIndex + distMiddle + distRing + distPinky) / 4;
-                        
-                        if (logCounter % 15 === 0) {
-                            console.log(`Hand ${handIdx}: I:${distIndex.toFixed(3)} M:${distMiddle.toFixed(3)} R:${distRing.toFixed(3)} P:${distPinky.toFixed(3)} T:${distThumb.toFixed(3)}`);
-                        }
-                        
-                        // Gesture detection - CHECK MOST SPECIFIC FIRST
-                        let gesture = null;
+                        const indexTip = landmarks[8], middleTip = landmarks[12];
+                        const ringTip = landmarks[16], pinkyTip = landmarks[20];
+                        const thumbTip = landmarks[4], palmPos = landmarks[9];
 
-                        // THUMBS UP: thumb extended, all fingers curled (easiest!)
+                        const distIndex  = Math.hypot(indexTip.x  - palmPos.x, indexTip.y  - palmPos.y);
+                        const distMiddle = Math.hypot(middleTip.x - palmPos.x, middleTip.y - palmPos.y);
+                        const distRing   = Math.hypot(ringTip.x   - palmPos.x, ringTip.y   - palmPos.y);
+                        const distPinky  = Math.hypot(pinkyTip.x  - palmPos.x, pinkyTip.y  - palmPos.y);
+                        const distThumb  = Math.hypot(thumbTip.x  - palmPos.x, thumbTip.y  - palmPos.y);
+
+                        let gesture = null;
                         if (distThumb > 0.12 && distIndex < 0.10 && distMiddle < 0.10 && distRing < 0.10 && distPinky < 0.10) {
                             gesture = 'glasses';
-                            console.log(`👍 THUMBS UP detected! (T:${distThumb.toFixed(3)} I:${distIndex.toFixed(3)} M:${distMiddle.toFixed(3)} R:${distRing.toFixed(3)} P:${distPinky.toFixed(3)})`);
-                        }
-                        // PEACE SIGN: index + middle extended, ring + pinky curled
-                        else if (distIndex > 0.10 && distMiddle > 0.10 && distRing < 0.12 && distPinky < 0.12) {
+                        } else if (distIndex > 0.10 && distMiddle > 0.10 && distRing < 0.12 && distPinky < 0.12) {
                             gesture = 'hat';
-                            console.log(`✌️ PEACE SIGN detected! (I:${distIndex.toFixed(3)} M:${distMiddle.toFixed(3)} R:${distRing.toFixed(3)} P:${distPinky.toFixed(3)})`);
-                        }
-                        // OPEN PALM: all 4 fingers extended (least specific - check LAST)
-                        else if (distIndex > 0.09 && distMiddle > 0.09 && distRing > 0.09 && distPinky > 0.09) {
+                        } else if (distIndex > 0.09 && distMiddle > 0.09 && distRing > 0.09 && distPinky > 0.09) {
                             gesture = 'food';
-                            console.log(`🖐️ OPEN PALM detected!`);
                         }
-                        
-                        if (gesture) {
-                            triggerShopItem(gesture, palmPos);
-                        }
-                        
-                        hands.push({
-                            x: palmPos.x,
-                            y: palmPos.y,
-                            gesture: gesture
-                        });
+
+                        if (gesture) triggerShopItem(gesture, palmPos);
+                        hands.push({ x: palmPos.x, y: palmPos.y, gesture });
                     });
-                } else {
-                    if (logCounter % 60 === 0) {
-                        console.log('⏳ Waiting for hands...');
-                    }
                 }
             });
 
             async function detectFrame() {
                 if (cameraActive && video.readyState === video.HAVE_ENOUGH_DATA) {
-                    try { await handDetector.send({ image: video }); } catch(e) {
-                        console.error('Detection error:', e.message);
-                    }
+                    try { await handDetector.send({ image: video }); } catch(e) {}
                 }
                 requestAnimationFrame(detectFrame);
             }
-            console.log('🔄 Starting detection loop...');
             detectFrame();
         } catch(err) {
-            debugInfo.cameraPermission = 'denied';
-            console.error('❌ Camera error:', err.message);
             console.warn('Camera not available:', err.message);
         }
     }
@@ -1516,23 +1486,18 @@
     // HAND-TRIGGERED FEEDING
     // ================================================================
     function spawnFoodAtHand(palmX, palmY) {
-        // Flip X coordinate (camera is mirrored)
         const flippedX = 1 - palmX;
         const screenX = flippedX * canvas.width;
         const screenY = palmY * canvas.height;
         const spreadRadius = 40;
-
-        console.log(`📍 spawnFoodAtHand called: screen pos (${screenX.toFixed(0)}, ${screenY.toFixed(0)})`);
 
         for (let i = 0; i < 5; i++) {
             const angle = Math.random() * Math.PI * 2;
             const distance = Math.random() * spreadRadius;
             const foodX = screenX + Math.cos(angle) * distance;
             const foodY = screenY + Math.sin(angle) * distance;
-
             if (foodX > 0 && foodX < canvas.width && foodY > 0 && foodY < canvas.height) {
                 foods.push(new Food(foodX, foodY));
-                console.log(`🍴 Food spawned at (${foodX.toFixed(0)}, ${foodY.toFixed(0)}) - Total food: ${foods.length}`);
             }
         }
     }
@@ -1540,13 +1505,8 @@
     // ================================================================
     // BACKGROUND
     // ================================================================
-    let debugInfo = {
-        mediapiloaded: false,
-        cameraPermission: 'pending',
-        handsDetected: 0,
-        lastUpdate: Date.now()
-    };
-    
+    let debugInfo = { cameraPermission: 'pending' };
+
     function drawBackground() {
         const tl = Math.min(feedCounter/300,1);
         const g = ctx.createLinearGradient(0,0,0,canvas.height);
@@ -1557,7 +1517,6 @@
         ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
         try { drawAllCorals(); } catch(e){}
         if (feedCounter>50) { ctx.fillStyle=`rgba(100,120,100,${(tl-0.17)*0.3})`; ctx.fillRect(0,0,canvas.width,canvas.height); }
-        // ── pollution murk: discarded consumer goods cloud the whole tank ──
         if (pollution > 0.01) {
             ctx.fillStyle = `rgba(96,82,38,${pollution*0.42})`;
             ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -1595,7 +1554,6 @@
         }
     }
 
-    // Coral snag zones — mid-height points where items can catch
     function getCoralSnagPoints() {
         return [
             { x: 80,               y: canvas.height - 75 },
@@ -1616,12 +1574,10 @@
             item.sinkSpeed = Math.min(item.sinkSpeed + 0.02, 2.5);
             item.rot = (item.rot||0) + 0.018;
 
-            // Check if passing near a coral snag point (only if not already snagged)
             if (!item.snagged) {
                 for (const snag of snagPoints) {
                     const dx = Math.abs(item.x - snag.x);
                     const dy = item.y - snag.y;
-                    // within horizontal range and just passed the snag height
                     if (dx < 55 && dy >= 0 && dy < 12 && Math.random() < 0.35) {
                         item.snagged = true;
                         restingItems.push({
@@ -1630,7 +1586,7 @@
                             x:      snag.x + (Math.random()-0.5)*28,
                             y:      snag.y + (Math.random()-0.5)*12,
                             rot:    (Math.random()-0.5)*0.7,
-                            tangled: true   // flag so we can draw a little string
+                            tangled: true
                         });
                         sinkingItems.splice(i,1);
                         break;
@@ -1639,7 +1595,6 @@
                 if (item.snagged) continue;
             }
 
-            // Hit the seabed
             if (item.y >= canvas.height - 32) {
                 restingItems.push({
                     type:  item.type,
@@ -1668,14 +1623,12 @@
             ctx.translate(item.x, item.y);
             ctx.rotate(item.rot);
 
-            // If tangled on coral, draw a little string above it
             if (item.tangled) {
                 ctx.strokeStyle = 'rgba(180,160,120,0.7)';
                 ctx.lineWidth = 1.2;
                 ctx.setLineDash([3,4]);
                 ctx.beginPath();
                 ctx.moveTo(0, -10);
-                // wavy string going up ~30px
                 ctx.quadraticCurveTo(8, -25, 2, -42);
                 ctx.stroke();
                 ctx.setLineDash([]);
@@ -1692,13 +1645,12 @@
                 const food=foods[j];
                 if (Math.hypot(fish.x-food.x,fish.y-food.y) < fish.size+food.size) {
                     foods.splice(j,1);
-                    fish.coins += 1;  // 1 food = 1 coin
-                    fish.hunger = HUNGER_MAX;  // eating refills the belly — rescues a starving fish
-                    // floating +1 text
-                    floatingTexts.push({ x:fish.x, y:fish.y - fish.size*2, text:'+1🪙', life:1.0, color:'#ffd700' });
+                    fish.coins += 1;
+                    fish.hunger = HUNGER_MAX;
+                    floatingTexts.push({ x:fish.x, y:fish.y - fish.size*2, text:'+1💰', life:1.0, color:'#ffd700' });
                     const ms=4, cs=Math.hypot(fish.speedX,fish.speedY);
                     if (cs>0) { fish.speedX=(fish.speedX/cs)*Math.min(cs*1.5,ms); fish.speedY=(fish.speedY/cs)*Math.min(cs*1.5,ms); }
-                    playSoundFoodDispense();  // Coin ding when fish eats
+                    playSoundFoodDispense();
                 }
             }
         });
@@ -1721,9 +1673,7 @@
     }
 
     // ================================================================
-    // MAIN LOOP
-    // ================================================================
-    // POLLUTION METER — drives the HTML progress bar (.progress-container)
+    // POLLUTION METER
     // ================================================================
     let _pollBar=null, _pollText=null, _pollBox=null, _pollLastPct=-1;
     function drawPollutionMeter() {
@@ -1735,13 +1685,12 @@
         }
         const p = Math.max(0, Math.min(1, pollution));
         const pct = Math.round(p*100);
-        if (pct === _pollLastPct) return;   // only touch the DOM when the value actually changes
+        if (pct === _pollLastPct) return;
         _pollLastPct = pct;
 
         _pollBar.style.height = pct + '%';
         _pollText.textContent = pct + '%';
 
-        // colour: clean teal → murky yellow → toxic brown
         let r,g,b;
         if (p < 0.5) { const t=p/0.5;       r=80+(225-80)*t;  g=210+(200-210)*t; b=200+(70-200)*t; }
         else         { const t=(p-0.5)/0.5; r=225+(170-225)*t; g=200+(85-200)*t;  b=70+(40-70)*t;  }
@@ -1753,38 +1702,21 @@
     }
 
     // ================================================================
-    // STATUS PANEL — bottom-right, replaces the loose debug text
+    // STATUS PANEL
     // ================================================================
-    function drawStatusPanel() {
-        const st = feedCounter>250?'Full Degradation':feedCounter>150?'Residue Accumulating':feedCounter>50?'Economy Emerging':'Natural Ecosystem';
-        const counts = `🐟 ${fishes.length}     🪼 ${jellies.length}     🗑 ${restingItems.length}`;
-        const w = 196, h = 46;
-        const x = canvas.width - w - 20, y = canvas.height - h - 18;
 
-        ctx.save();
-        // plate (matches the shop / gesture panels)
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        ctx.strokeStyle = 'rgba(118,215,255,0.2)'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
-
-        ctx.textAlign = 'left';
-        ctx.font = 'bold 10px Arial'; ctx.fillStyle = 'rgba(118,215,255,0.9)';
-        ctx.fillText(st.toUpperCase(), x + 14, y + 18);
-        ctx.font = '14px Arial'; ctx.fillStyle = 'rgba(255,255,255,0.88)';
-        ctx.fillText(counts, x + 14, y + 36);
-        ctx.restore();
-    }
-
+    // ================================================================
+    // MAIN LOOP
+    // ================================================================
     function animate() {
         ctx.clearRect(0,0,canvas.width,canvas.height);
         frameCount++;
 
-        // ── Pollution tracks seabed litter; the tank recovers when buying stops ──
         const litter = restingItems.length + sinkingItems.length*0.5;
         const targetPollution = Math.min(litter / POLLUTION_FULL, 1);
-        pollution += (targetPollution - pollution) * 0.05;   // smooth follow
+        pollution += (targetPollution - pollution) * 0.05;
         if (frameCount - lastBuyFrame > HEAL_DELAY && restingItems.length > 0) {
-            const it = restingItems[0];                       // fade the oldest litter piece away
+            const it = restingItems[0];
             it.opacity = (it.opacity ?? 1) - 0.004;
             if (it.opacity <= 0) restingItems.shift();
         }
@@ -1801,20 +1733,19 @@
         foods.forEach(f=>{ f.update(); f.draw(); });
 
         drawRestingItems();
+        updateDrawCrabs();
+        updateDrawOctopus();
 
-        // Jellyfish drift behind the live fish, accumulating over time
         jellies.forEach(j=>{ j.update(); j.draw(); });
 
         fishes.forEach(f=>{ f.update(); f.draw(); });
         checkFishFoodCollision();
         checkPredation();
 
-        // ── Remove dead fish (with the right send-off) ──
         for (let i=fishes.length-1;i>=0;i--){
             const f = fishes[i];
             if (!f.dead) continue;
             if (!f.becameJelly && !f.eaten) {
-                // starved out
                 floatingTexts.push({ x:f.x, y:f.y - f.size*1.6, text:'💀', life:1.0, color:'#9aa' });
                 for (let b=0;b<4;b++){ const bb=new Bubble(); bb.x=f.x+(Math.random()-0.5)*16; bb.y=f.y; bubbles.push(bb); }
                 playSoundDeath();
@@ -1822,7 +1753,6 @@
             fishes.splice(i,1);
         }
 
-        // ── Population floor: auto-respawn up to MIN_FISH ──
         if (fishes.length < MIN_FISH) {
             if (--respawnTimer <= 0) {
                 const nf = new Fish({ size: 11, speedMultiplier: 1.4 });
@@ -1836,14 +1766,389 @@
 
         drawSinkingItems();
         drawFloatingTexts();
-
-        drawStatusPanel();
         drawPollutionMeter();
 
-        // Draw hand skeleton on top of everything, every frame
         latestHandLandmarks.forEach(lm => drawHandSkeleton(lm));
 
         requestAnimationFrame(animate);
+    }
+
+    // ================================================================
+    // CRABS
+    // ================================================================
+    let crabs = [];
+
+    class Crab {
+        constructor() {
+            this.reset(true);
+        }
+        reset(initial) {
+            this.x = initial ? Math.random() * canvas.width : (Math.random() < 0.5 ? -40 : canvas.width + 40);
+            this.y = canvas.height - 14;
+            this.dir = this.x < canvas.width / 2 ? 1 : -1;
+            this.speed = 0.4 + Math.random() * 0.5;
+            this.size = 10 + Math.random() * 8;
+            this.color = `hsl(${10 + Math.random() * 25},${70 + Math.random() * 20}%,${38 + Math.random() * 15}%)`;
+            this.legPhase = Math.random() * Math.PI * 2;
+            // Pause behaviour
+            this.pauseTimer = 0;
+            this.pauseDuration = 0;
+            this.paused = false;
+        }
+        update() {
+            this.legPhase += 0.18;
+
+            if (this.paused) {
+                this.pauseTimer--;
+                if (this.pauseTimer <= 0) this.paused = false;
+                return;
+            }
+
+            // Random pause
+            if (Math.random() < 0.004) {
+                this.paused = true;
+                this.pauseTimer = 40 + Math.floor(Math.random() * 80);
+                return;
+            }
+
+            // Random direction flip
+            if (Math.random() < 0.006) this.dir *= -1;
+
+            this.x += this.speed * this.dir;
+
+            // Wrap off-screen
+            if (this.x > canvas.width + 50 || this.x < -50) this.reset(false);
+        }
+        draw() {
+            const s = this.size;
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            // flip horizontally when moving left
+            ctx.scale(this.dir, 1);
+
+            const lw = this.paused ? 0 : Math.sin(this.legPhase);
+
+            // ── 6 walking legs ──
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = s * 0.13;
+            ctx.lineCap = 'round';
+
+            const legAngles = [-0.55, 0, 0.55];
+            legAngles.forEach((baseAngle, i) => {
+                const wave = (i % 2 === 0 ? 1 : -1) * lw * 0.25;
+                // Bottom legs
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.4 + i * s * 0.4, s * 0.15);
+                ctx.lineTo(-s * 0.8 + i * s * 0.55, s * 0.5 + wave * s);
+                ctx.lineTo(-s * 0.5 + i * s * 0.5, s * 0.85 + wave * s * 0.5);
+                ctx.stroke();
+            });
+
+            // ── 2 claws ──
+            // Front claw (bigger)
+            ctx.beginPath();
+            ctx.moveTo(s * 0.55, s * 0.1);
+            ctx.lineTo(s * 1.1, -s * 0.1 + lw * s * 0.15);
+            ctx.stroke();
+            // Claw pincer top
+            ctx.beginPath();
+            ctx.moveTo(s * 1.1, -s * 0.1 + lw * s * 0.15);
+            ctx.lineTo(s * 1.35, -s * 0.28 + lw * s * 0.1);
+            ctx.stroke();
+            // Claw pincer bottom
+            ctx.beginPath();
+            ctx.moveTo(s * 1.1, -s * 0.1 + lw * s * 0.15);
+            ctx.lineTo(s * 1.3, s * 0.08 + lw * s * 0.1);
+            ctx.stroke();
+
+            // Back claw (smaller)
+            ctx.beginPath();
+            ctx.moveTo(-s * 0.55, s * 0.1);
+            ctx.lineTo(-s * 0.9, -s * 0.05 - lw * s * 0.1);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-s * 0.9, -s * 0.05 - lw * s * 0.1);
+            ctx.lineTo(-s * 1.1, -s * 0.2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-s * 0.9, -s * 0.05 - lw * s * 0.1);
+            ctx.lineTo(-s * 1.05, s * 0.1);
+            ctx.stroke();
+
+            // ── Body (rounded rectangle shell) ──
+            const bg = ctx.createRadialGradient(-s * 0.1, -s * 0.2, s * 0.1, 0, 0, s * 0.9);
+            bg.addColorStop(0, lightenColor(this.color, 30));
+            bg.addColorStop(1, this.color);
+            ctx.fillStyle = bg;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, s * 0.75, s * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+            // Shell ridge
+            ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.7;
+            ctx.beginPath(); ctx.ellipse(0, 0, s * 0.5, s * 0.33, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(0, 0, s * 0.25, s * 0.16, 0, 0, Math.PI * 2); ctx.stroke();
+
+            // ── Eyes (two stalks on top) ──
+            ctx.fillStyle = this.color;
+            [-1, 1].forEach(side => {
+                // Stalk
+                ctx.beginPath();
+                ctx.moveTo(side * s * 0.28, -s * 0.42);
+                ctx.lineTo(side * s * 0.35, -s * 0.68);
+                ctx.strokeStyle = this.color; ctx.lineWidth = s * 0.1; ctx.stroke();
+                // Eyeball
+                ctx.beginPath(); ctx.arc(side * s * 0.36, -s * 0.72, s * 0.13, 0, Math.PI * 2);
+                ctx.fillStyle = '#111'; ctx.fill();
+                // Shine
+                ctx.beginPath(); ctx.arc(side * s * 0.33, -s * 0.75, s * 0.05, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+            });
+
+            ctx.restore();
+        }
+    }
+
+    function lightenColor(hsl, amount) {
+        // e.g. "hsl(15,80%,42%)" → lighten by amount%
+        return hsl.replace(/(\d+)%\)$/, (_, l) => `${Math.min(100, parseInt(l) + amount)}%)`);
+    }
+
+    function initCrabs() {
+        crabs = [];
+        const count = 4 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < count; i++) crabs.push(new Crab());
+    }
+
+    function updateDrawCrabs() {
+        crabs.forEach(c => { c.update(); c.draw(); });
+    }
+
+    // ================================================================
+    // OCTOPUS — crawls around coral bases on the seabed
+    // ================================================================
+    let octopus = null;
+
+    // Waypoints: coral / rock x positions near the seabed the octopus visits
+    function getOctopusWaypoints() {
+        return [
+            canvas.width * 0.08,
+            canvas.width * 0.20,
+            canvas.width * 0.35,
+            canvas.width * 0.50,
+            canvas.width * 0.65,
+            canvas.width * 0.80,
+            canvas.width * 0.92,
+        ];
+    }
+
+    class Octopus {
+        constructor() {
+            this.size   = 22;
+            this.color  = `hsl(${265 + Math.random()*30},60%,28%)`;
+            this.y      = canvas.height - this.size * 0.6;
+            this.phase  = 0;
+            this.blinkTimer  = 150 + Math.floor(Math.random()*180);
+            this.blinking    = false;
+            this.blinkFrame  = 0;
+
+            // Waypoint navigation
+            const wps   = getOctopusWaypoints();
+            this.wpIdx  = Math.floor(Math.random() * wps.length);
+            this.x      = wps[this.wpIdx];
+            this._pickNextWaypoint();
+
+            // Arm tip positions — 8 arms each tracked as a segment chain
+            this.arms = Array.from({length:8}, (_,i) => this._initArm(i));
+        }
+
+        _initArm(i) {
+            const angle = Math.PI * (0.15 + (i / 7) * 0.7); // fan: ~27° to ~153° (spread along bottom)
+            return {
+                angle,
+                phase: (i / 8) * Math.PI * 2,   // stagger wave
+                // 4 segments per arm
+                segs: Array.from({length:4}, (_,s) => ({
+                    x: this.x + Math.cos(angle) * s * this.size * 0.7,
+                    y: this.y  + Math.sin(angle) * s * this.size * 0.5,
+                }))
+            };
+        }
+
+        _pickNextWaypoint() {
+            const wps = getOctopusWaypoints();
+            let next;
+            do { next = Math.floor(Math.random() * wps.length); } while (next === this.wpIdx && wps.length > 1);
+            this.wpIdx   = next;
+            this.targetX = wps[next];
+            this.pausing = false;
+            this.pauseTimer = 0;
+        }
+
+        update() {
+            this.phase += 0.045;
+
+            // Blink
+            this.blinkTimer--;
+            if (this.blinkTimer <= 0) { this.blinking = true; this.blinkFrame = 0; this.blinkTimer = 140 + Math.floor(Math.random()*200); }
+            if (this.blinking) { this.blinkFrame++; if (this.blinkFrame > 12) this.blinking = false; }
+
+            // Move toward waypoint
+            if (this.pausing) {
+                this.pauseTimer--;
+                if (this.pauseTimer <= 0) this._pickNextWaypoint();
+            } else {
+                const dx = this.targetX - this.x;
+                if (Math.abs(dx) < 2) {
+                    // Arrived — pause at the coral
+                    this.pausing    = true;
+                    this.pauseTimer = 80 + Math.floor(Math.random() * 140);
+                } else {
+                    this.x += Math.sign(dx) * (0.5 + Math.abs(dx) * 0.012);
+                }
+            }
+
+            // Update arm segments — each follows the previous with a wave
+            this.arms.forEach((arm, ai) => {
+                arm.phase += 0.03;
+                const s  = this.size;
+                const moving = !this.pausing;
+
+                // Base angle fans from body, flips with direction of travel
+                const dir    = this.targetX > this.x ? 1 : -1;
+                const spread = (ai / 7 - 0.5) * Math.PI * 0.85; // –76° to +76°
+                const baseA  = Math.PI * 0.5 + spread;           // pointing downward/outward
+
+                arm.segs[0].x = this.x;
+                arm.segs[0].y = this.y;
+
+                for (let si = 1; si < arm.segs.length; si++) {
+                    const prev = arm.segs[si - 1];
+                    const segLen  = s * (0.72 - si * 0.06);       // taper
+                    const wave    = Math.sin(arm.phase + si * 0.9) * (moving ? 0.32 : 0.12);
+                    const angle   = baseA + wave;
+                    arm.segs[si].x = prev.x + Math.cos(angle) * segLen;
+                    arm.segs[si].y = Math.min(canvas.height - 4, prev.y + Math.sin(angle) * segLen * 0.55);
+                }
+            });
+        }
+
+        draw() {
+            const s = this.size;
+            ctx.save();
+
+            // ── Draw 8 tentacles BEHIND body ──
+            this.arms.forEach((arm, ai) => {
+                const segs = arm.segs;
+                if (segs.length < 2) return;
+
+                // Smooth curve through segment points
+                ctx.beginPath();
+                ctx.moveTo(segs[0].x, segs[0].y);
+                for (let si = 1; si < segs.length; si++) {
+                    const prev = segs[si-1];
+                    const curr = segs[si];
+                    const mx   = (prev.x + curr.x) / 2;
+                    const my   = (prev.y + curr.y) / 2;
+                    ctx.quadraticCurveTo(prev.x, prev.y, mx, my);
+                }
+                const last = segs[segs.length-1];
+                ctx.lineTo(last.x, last.y);
+
+                // Thickness tapers from base to tip
+                const baseWidth = s * 0.28;
+                ctx.lineWidth   = baseWidth;
+                ctx.strokeStyle = this.color;
+                ctx.lineCap     = 'round';
+                ctx.lineJoin    = 'round';
+                ctx.stroke();
+
+                // Thinner lighter overlay for taper effect
+                ctx.beginPath();
+                ctx.moveTo(segs[1].x, segs[1].y);
+                for (let si = 2; si < segs.length; si++) {
+                    const prev = segs[si-1];
+                    const curr = segs[si];
+                    ctx.quadraticCurveTo(prev.x, prev.y, (prev.x+curr.x)/2, (prev.y+curr.y)/2);
+                }
+                ctx.lineTo(last.x, last.y);
+                ctx.lineWidth   = s * 0.1;
+                ctx.strokeStyle = lightenColor(this.color, 18);
+                ctx.stroke();
+
+                // Suckers along tentacle
+                ctx.fillStyle = lightenColor(this.color, 30);
+                for (let si = 1; si < segs.length; si++) {
+                    const prev = segs[si-1];
+                    const curr = segs[si];
+                    const mx = (prev.x + curr.x) / 2;
+                    const my = (prev.y + curr.y) / 2;
+                    const r  = s * (0.06 - si * 0.01);
+                    if (r > 1) {
+                        ctx.beginPath();
+                        ctx.arc(mx, my, r, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            });
+
+            // ── Mantle (body) — drawn on top of arm bases ──
+            ctx.translate(this.x, this.y);
+
+            const mg = ctx.createRadialGradient(-s*0.1, -s*0.4, s*0.05, 0, -s*0.15, s*0.75);
+            mg.addColorStop(0, lightenColor(this.color, 32));
+            mg.addColorStop(1, this.color);
+            ctx.fillStyle = mg;
+            ctx.beginPath();
+            ctx.ellipse(0, -s*0.2, s*0.52, s*0.68, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+
+            // Mantle dome top
+            ctx.beginPath();
+            ctx.ellipse(0, -s*0.75, s*0.28, s*0.2, 0, 0, Math.PI*2);
+            ctx.fillStyle = lightenColor(this.color, 14); ctx.fill();
+
+            // Skin spots
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            [[-s*0.17,-s*0.22],[s*0.19,-s*0.08],[-s*0.06,-s*0.5],[s*0.14,-s*0.42]].forEach(([dx,dy]) => {
+                ctx.beginPath(); ctx.arc(dx, dy, s*0.09, 0, Math.PI*2); ctx.fill();
+            });
+
+            // ── Eyes ──
+            [-1,1].forEach(side => {
+                const ex = side * s * 0.26, ey = -s * 0.16;
+                ctx.beginPath(); ctx.arc(ex, ey, s*0.16, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255,245,215,0.92)'; ctx.fill();
+                if (!this.blinking) {
+                    // Horizontal slit pupil
+                    ctx.beginPath();
+                    ctx.ellipse(ex, ey, s*0.05, s*0.11, 0, 0, Math.PI*2);
+                    ctx.fillStyle = '#180808'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(ex+s*0.04, ey-s*0.06, s*0.045, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(ex - s*0.13, ey); ctx.lineTo(ex + s*0.13, ey);
+                    ctx.strokeStyle = '#180808'; ctx.lineWidth = 2; ctx.stroke();
+                }
+                ctx.beginPath(); ctx.arc(ex, ey, s*0.16, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+            });
+
+            ctx.restore();
+        }
+    }
+
+    function initOctopus() {
+        octopus = new Octopus();
+    }
+
+    function updateDrawOctopus() {
+        if (!octopus) return;
+        octopus.update();
+        octopus.draw();
     }
 
     function initFishes(cfg={}) {
@@ -1851,36 +2156,28 @@
         for (let i=0;i<(cfg.count||8);i++) fishes.push(new Fish(cfg.fishConfig||{}));
     }
 
-    // Click canvas to drop food
     canvas.addEventListener('click', e => foods.push(new Food(e.clientX, e.clientY)));
 
     // ================================================================
     // INIT
     // ================================================================
-    console.log('🚀 Aquarium initializing...');
     initRockPositions();
     initCoralPositions();
+    initPearlShells();
+    initCrabs();
+    initOctopus();
     initFishes();
     initSeaweedParticles();
     animate();
 
-    console.log('⏳ Waiting for MediaPipe library to load...');
     const waitForMediaPipe = setInterval(() => {
-        if (window.Hands) { 
-            console.log('✅ MediaPipe Hands loaded! Starting hand detection...');
-            debugInfo.mediapiloaded = true;
-            clearInterval(waitForMediaPipe); 
-            initHandDetection(); 
-        } else {
-            console.log('⏳ Still waiting for MediaPipe...');
+        if (window.Hands) {
+            clearInterval(waitForMediaPipe);
+            initHandDetection();
         }
     }, 100);
     </script>
 
-    <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- UNDERWATER AMBIENCE — Web Audio API synthesis -->
-    <!-- Activated on first user interaction (autoplay policy) -->
-    <!-- ══════════════════════════════════════════════════════════ -->
     <script>
     (function() {
       let _ac = null;
@@ -1888,16 +2185,9 @@
         if (!_ac) {
           try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) {
-              console.error('❌ Web Audio API not supported');
-              return null;
-            }
+            if (!AudioCtx) return null;
             _ac = new AudioCtx();
-            console.log('✅ AudioContext created - State:', _ac.state);
-          } catch (e) {
-            console.error('❌ Failed to create AudioContext:', e.message);
-            return null;
-          }
+          } catch (e) { return null; }
         }
         return _ac;
       }
@@ -1905,152 +2195,130 @@
       function startUnderwaterAmbience() {
         try {
           const ac = getAC();
-          if (!ac) {
-            console.error('❌ Cannot start ambience - no AudioContext');
-            return;
-          }
-          console.log('🌊 Starting underwater ambience synthesis...');
+          if (!ac) return;
           const master = ac.createGain();
-        master.gain.setValueAtTime(0, ac.currentTime);
-        master.gain.linearRampToValueAtTime(0.55, ac.currentTime + 4.0);
-        master.connect(ac.destination);
+          master.gain.setValueAtTime(0, ac.currentTime);
+          master.gain.linearRampToValueAtTime(0.55, ac.currentTime + 4.0);
+          master.connect(ac.destination);
 
-        // ── Deep water pressure hum ──
-        (function makeDeepHum() {
-          const osc1=ac.createOscillator(), osc2=ac.createOscillator();
-          const lfo=ac.createOscillator(), lfoG=ac.createGain();
-          const g=ac.createGain(), lp=ac.createBiquadFilter();
-          lp.type='lowpass'; lp.frequency.value=180;
-          osc1.type='sine'; osc1.frequency.value=42;
-          osc2.type='sine'; osc2.frequency.value=47.3;
-          lfo.type='sine'; lfo.frequency.value=0.07; lfoG.gain.value=6;
-          lfo.connect(lfoG); lfoG.connect(osc1.frequency); lfoG.connect(osc2.frequency);
-          g.gain.value=0.28;
-          osc1.connect(lp); osc2.connect(lp); lp.connect(g); g.connect(master);
-          osc1.start(); osc2.start(); lfo.start();
-        })();
+          (function makeDeepHum() {
+            const osc1=ac.createOscillator(), osc2=ac.createOscillator();
+            const lfo=ac.createOscillator(), lfoG=ac.createGain();
+            const g=ac.createGain(), lp=ac.createBiquadFilter();
+            lp.type='lowpass'; lp.frequency.value=180;
+            osc1.type='sine'; osc1.frequency.value=42;
+            osc2.type='sine'; osc2.frequency.value=47.3;
+            lfo.type='sine'; lfo.frequency.value=0.07; lfoG.gain.value=6;
+            lfo.connect(lfoG); lfoG.connect(osc1.frequency); lfoG.connect(osc2.frequency);
+            g.gain.value=0.28;
+            osc1.connect(lp); osc2.connect(lp); lp.connect(g); g.connect(master);
+            osc1.start(); osc2.start(); lfo.start();
+          })();
 
-        // ── Resonant water column ──
-        (function makeWaterColumn() {
-          const osc=ac.createOscillator(), lfo=ac.createOscillator();
-          const lfoG=ac.createGain(), bp=ac.createBiquadFilter(), g=ac.createGain();
-          osc.type='sawtooth'; osc.frequency.value=28;
-          lfo.type='sine'; lfo.frequency.value=0.13; lfoG.gain.value=3;
-          bp.type='bandpass'; bp.frequency.value=110; bp.Q.value=8; g.gain.value=0.12;
-          lfo.connect(lfoG); lfoG.connect(bp.frequency);
-          osc.connect(bp); bp.connect(g); g.connect(master);
-          osc.start(); lfo.start();
-        })();
-
-        // ── Underwater pink noise wash ──
-        (function makeWash() {
-          const len=ac.sampleRate*6, buf=ac.createBuffer(1,len,ac.sampleRate);
-          const d=buf.getChannelData(0);
-          let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
-          for(let i=0;i<len;i++){
-            const wh=Math.random()*2-1;
-            b0=0.99886*b0+wh*0.0555179; b1=0.99332*b1+wh*0.0750759;
-            b2=0.96900*b2+wh*0.1538520; b3=0.86650*b3+wh*0.3104856;
-            b4=0.55000*b4+wh*0.5329522; b5=-0.7616*b5-wh*0.0168980;
-            d[i]=(b0+b1+b2+b3+b4+b5+b6+wh*0.5362)*0.11; b6=wh*0.115926;
-          }
-          const src=ac.createBufferSource(); src.buffer=buf; src.loop=true;
-          const lp1=ac.createBiquadFilter(); lp1.type='lowpass'; lp1.frequency.value=320;
-          const lp2=ac.createBiquadFilter(); lp2.type='lowpass'; lp2.frequency.value=180;
-          const hp=ac.createBiquadFilter();  hp.type='highpass'; hp.frequency.value=18;
-          const lfo=ac.createOscillator(); lfo.type='sine'; lfo.frequency.value=0.04;
-          const lfoG=ac.createGain(); lfoG.gain.value=0.06;
-          const g=ac.createGain(); g.gain.value=0.18;
-          lfo.connect(lfoG); lfoG.connect(g.gain);
-          src.connect(hp); hp.connect(lp1); lp1.connect(lp2); lp2.connect(g); g.connect(master);
-          src.start(); lfo.start();
-        })();
-
-        // ── Random rising bubble pops — 3 streams ──
-        function scheduleBubble() {
-          setTimeout(function() {
-            const now=ac.currentTime, f=280+Math.random()*320, dur=0.08+Math.random()*0.14;
-            const osc=ac.createOscillator(), g=ac.createGain(), lp=ac.createBiquadFilter();
-            lp.type='lowpass'; lp.frequency.value=1600; osc.type='sine';
-            osc.frequency.setValueAtTime(f,now);
-            osc.frequency.exponentialRampToValueAtTime(f*1.7,now+dur*0.5);
-            osc.frequency.exponentialRampToValueAtTime(f*0.5,now+dur);
-            g.gain.setValueAtTime(0.001,now);
-            g.gain.linearRampToValueAtTime(0.09+Math.random()*0.06,now+0.008);
-            g.gain.exponentialRampToValueAtTime(0.001,now+dur);
-            osc.connect(lp); lp.connect(g); g.connect(master);
-            osc.start(now); osc.stop(now+dur+0.05);
-            const nlen=Math.floor(ac.sampleRate*dur*0.4);
-            const nbuf=ac.createBuffer(1,nlen,ac.sampleRate);
-            const nd=nbuf.getChannelData(0); for(let i=0;i<nlen;i++) nd[i]=Math.random()*2-1;
-            const nsrc=ac.createBufferSource(); nsrc.buffer=nbuf;
-            const nbp=ac.createBiquadFilter(); nbp.type='bandpass'; nbp.frequency.value=f*1.2; nbp.Q.value=4;
-            const ng=ac.createGain();
-            ng.gain.setValueAtTime(0.04,now); ng.gain.exponentialRampToValueAtTime(0.001,now+dur*0.3);
-            nsrc.connect(nbp); nbp.connect(ng); ng.connect(master);
-            nsrc.start(now); nsrc.stop(now+dur*0.4+0.05);
-            scheduleBubble();
-          }, (Math.random()*3.2+0.4)*1000);
-        }
-        scheduleBubble(); scheduleBubble(); scheduleBubble();
-
-        // ── Distant low rumble ──
-        (function makeRumble() {
-          const osc=ac.createOscillator(), lfo=ac.createOscillator();
-          const lfoG=ac.createGain(), g=ac.createGain(), lp=ac.createBiquadFilter();
-          lp.type='lowpass'; lp.frequency.value=60;
-          osc.type='sine'; osc.frequency.value=22;
-          lfo.type='sine'; lfo.frequency.value=0.03; lfoG.gain.value=8; g.gain.value=0.22;
-          lfo.connect(lfoG); lfoG.connect(osc.frequency);
-          osc.connect(lp); lp.connect(g); g.connect(master);
-          osc.start(); lfo.start();
-        })();
-
-        // ── Occasional metallic creak ──
-        function scheduleCreak() {
-          setTimeout(function() {
-            const now=ac.currentTime, f=180+Math.random()*120;
-            const osc=ac.createOscillator(), g=ac.createGain(), bp=ac.createBiquadFilter();
-            bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=12;
-            osc.type='sawtooth'; osc.frequency.value=f;
-            osc.frequency.linearRampToValueAtTime(f*(0.85+Math.random()*0.3), now+1.2);
-            g.gain.setValueAtTime(0.001,now);
-            g.gain.linearRampToValueAtTime(0.06,now+0.3);
-            g.gain.linearRampToValueAtTime(0.001,now+1.8);
+          (function makeWaterColumn() {
+            const osc=ac.createOscillator(), lfo=ac.createOscillator();
+            const lfoG=ac.createGain(), bp=ac.createBiquadFilter(), g=ac.createGain();
+            osc.type='sawtooth'; osc.frequency.value=28;
+            lfo.type='sine'; lfo.frequency.value=0.13; lfoG.gain.value=3;
+            bp.type='bandpass'; bp.frequency.value=110; bp.Q.value=8; g.gain.value=0.12;
+            lfo.connect(lfoG); lfoG.connect(bp.frequency);
             osc.connect(bp); bp.connect(g); g.connect(master);
-            osc.start(now); osc.stop(now+2.0);
-            scheduleCreak();
-          }, 6000+Math.random()*12000);
-        }
-        scheduleCreak();
+            osc.start(); lfo.start();
+          })();
 
-        console.log('🌊 Underwater ambience activated');
-      } catch (e) {
-        console.error('❌ Error in startUnderwaterAmbience:', e.message, e);
-      }
+          (function makeWash() {
+            const len=ac.sampleRate*6, buf=ac.createBuffer(1,len,ac.sampleRate);
+            const d=buf.getChannelData(0);
+            let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+            for(let i=0;i<len;i++){
+              const wh=Math.random()*2-1;
+              b0=0.99886*b0+wh*0.0555179; b1=0.99332*b1+wh*0.0750759;
+              b2=0.96900*b2+wh*0.1538520; b3=0.86650*b3+wh*0.3104856;
+              b4=0.55000*b4+wh*0.5329522; b5=-0.7616*b5-wh*0.0168980;
+              d[i]=(b0+b1+b2+b3+b4+b5+b6+wh*0.5362)*0.11; b6=wh*0.115926;
+            }
+            const src=ac.createBufferSource(); src.buffer=buf; src.loop=true;
+            const lp1=ac.createBiquadFilter(); lp1.type='lowpass'; lp1.frequency.value=320;
+            const lp2=ac.createBiquadFilter(); lp2.type='lowpass'; lp2.frequency.value=180;
+            const hp=ac.createBiquadFilter();  hp.type='highpass'; hp.frequency.value=18;
+            const lfo=ac.createOscillator(); lfo.type='sine'; lfo.frequency.value=0.04;
+            const lfoG=ac.createGain(); lfoG.gain.value=0.06;
+            const g=ac.createGain(); g.gain.value=0.18;
+            lfo.connect(lfoG); lfoG.connect(g.gain);
+            src.connect(hp); hp.connect(lp1); lp1.connect(lp2); lp2.connect(g); g.connect(master);
+            src.start(); lfo.start();
+          })();
+
+          function scheduleBubble() {
+            setTimeout(function() {
+              const now=ac.currentTime, f=280+Math.random()*320, dur=0.08+Math.random()*0.14;
+              const osc=ac.createOscillator(), g=ac.createGain(), lp=ac.createBiquadFilter();
+              lp.type='lowpass'; lp.frequency.value=1600; osc.type='sine';
+              osc.frequency.setValueAtTime(f,now);
+              osc.frequency.exponentialRampToValueAtTime(f*1.7,now+dur*0.5);
+              osc.frequency.exponentialRampToValueAtTime(f*0.5,now+dur);
+              g.gain.setValueAtTime(0.001,now);
+              g.gain.linearRampToValueAtTime(0.09+Math.random()*0.06,now+0.008);
+              g.gain.exponentialRampToValueAtTime(0.001,now+dur);
+              osc.connect(lp); lp.connect(g); g.connect(master);
+              osc.start(now); osc.stop(now+dur+0.05);
+              const nlen=Math.floor(ac.sampleRate*dur*0.4);
+              const nbuf=ac.createBuffer(1,nlen,ac.sampleRate);
+              const nd=nbuf.getChannelData(0); for(let i=0;i<nlen;i++) nd[i]=Math.random()*2-1;
+              const nsrc=ac.createBufferSource(); nsrc.buffer=nbuf;
+              const nbp=ac.createBiquadFilter(); nbp.type='bandpass'; nbp.frequency.value=f*1.2; nbp.Q.value=4;
+              const ng=ac.createGain();
+              ng.gain.setValueAtTime(0.04,now); ng.gain.exponentialRampToValueAtTime(0.001,now+dur*0.3);
+              nsrc.connect(nbp); nbp.connect(ng); ng.connect(master);
+              nsrc.start(now); nsrc.stop(now+dur*0.4+0.05);
+              scheduleBubble();
+            }, (Math.random()*3.2+0.4)*1000);
+          }
+          scheduleBubble(); scheduleBubble(); scheduleBubble();
+
+          (function makeRumble() {
+            const osc=ac.createOscillator(), lfo=ac.createOscillator();
+            const lfoG=ac.createGain(), g=ac.createGain(), lp=ac.createBiquadFilter();
+            lp.type='lowpass'; lp.frequency.value=60;
+            osc.type='sine'; osc.frequency.value=22;
+            lfo.type='sine'; lfo.frequency.value=0.03; lfoG.gain.value=8; g.gain.value=0.22;
+            lfo.connect(lfoG); lfoG.connect(osc.frequency);
+            osc.connect(lp); lp.connect(g); g.connect(master);
+            osc.start(); lfo.start();
+          })();
+
+          function scheduleCreak() {
+            setTimeout(function() {
+              const now=ac.currentTime, f=180+Math.random()*120;
+              const osc=ac.createOscillator(), g=ac.createGain(), bp=ac.createBiquadFilter();
+              bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=12;
+              osc.type='sawtooth'; osc.frequency.value=f;
+              osc.frequency.linearRampToValueAtTime(f*(0.85+Math.random()*0.3), now+1.2);
+              g.gain.setValueAtTime(0.001,now);
+              g.gain.linearRampToValueAtTime(0.06,now+0.3);
+              g.gain.linearRampToValueAtTime(0.001,now+1.8);
+              osc.connect(bp); bp.connect(g); g.connect(master);
+              osc.start(now); osc.stop(now+2.0);
+              scheduleCreak();
+            }, 6000+Math.random()*12000);
+          }
+          scheduleCreak();
+        } catch (e) {}
       }
 
-      // Initialize immediately on page load
       let started = false;
       function tryStart() {
         if (started) return;
         started = true;
-        console.log('🌊 Starting underwater ambience...');
         startUnderwaterAmbience();
       }
-      
-      console.log('🎮 Aquarium loaded - attempting immediate audio initialization');
-      
-      // Try to start immediately when page loads
+
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          setTimeout(tryStart, 100);
-        });
+        document.addEventListener('DOMContentLoaded', () => setTimeout(tryStart, 100));
       } else {
         setTimeout(tryStart, 100);
       }
-      
-      // Backup: also start on any user interaction (for autoplay policy compliance)
+
       document.addEventListener('click',     tryStart, { once: true });
       document.addEventListener('keydown',   tryStart, { once: true });
       document.addEventListener('mousemove', tryStart, { once: true });
